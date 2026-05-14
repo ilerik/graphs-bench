@@ -107,6 +107,9 @@ fn find_pivots(ctx: &mut Context, b: f64, s: &[u32]) -> (Vec<u32>, Vec<u32>) {
                     if nd < dv {
                         ctx.d[v as usize] = nd;
                     }
+                    // Under Assumption 2.1 (distinct path lengths) ties
+                    // don't occur; with equal weights the last-visited
+                    // tight-edge parent wins, which is fine for pivot selection.
                     if !s_set.contains(&v) {
                         parent.insert(v, u);
                     }
@@ -135,10 +138,15 @@ fn find_pivots(ctx: &mut Context, b: f64, s: &[u32]) -> (Vec<u32>, Vec<u32>) {
     // Build the tight-edge forest's tree sizes. Each vertex of W traces its
     // parent chain up to the unique root in S (under Assumption 2.1) and
     // increments that root's counter.
+    //
+    // If `parent[cur]` is missing (should not happen for v ∈ W \ S under a
+    // consistent run) or the chain cycles, we stop without counting — that
+    // vertex simply does not contribute to any pivot's subtree size.
+    let max_chain = w_list.len().saturating_add(1);
     let mut tree_size: HashMap<u32, usize> = HashMap::new();
     for &v in &w_list {
         let mut cur = v;
-        loop {
+        for _ in 0..max_chain {
             if s_set.contains(&cur) {
                 *tree_size.entry(cur).or_insert(0) += 1;
                 break;
@@ -277,7 +285,10 @@ fn bmssp(ctx: &mut Context, l: usize, b: f64, s: &[u32]) -> (f64, Vec<u32>) {
         bprime_0 = b;
     }
 
+    // `U` is a union of recursive returns; the same vertex can appear in more
+    // than one `U_i`, so we dedupe for the `|U|` workload cap.
     let mut u: HashSet<u32> = HashSet::new();
+
     let mut last_bprime: f64 = bprime_0;
 
     let success: bool;
@@ -440,5 +451,23 @@ mod tests {
         let d_bmssp = sssp_bmssp(&g, 0);
         let d_dij = dijkstra(&g, 0);
         assert_distances_match(&d_bmssp, &d_dij);
+    }
+
+    #[test]
+    fn unreachable_vertices() {
+        // Two disconnected components: 0→1→2 and isolated 3→4.
+        // Vertices 3 and 4 are unreachable from source 0.
+        let g = Graph::from_edges(
+            5,
+            &[(0, 1, 1.0), (1, 2, 2.0), (3, 4, 1.0)],
+        );
+        let d_bmssp = sssp_bmssp(&g, 0);
+        let d_dij = dijkstra(&g, 0);
+        assert_distances_match(&d_bmssp, &d_dij);
+        assert_eq!(d_bmssp[0], 0.0);
+        assert_eq!(d_bmssp[1], 1.0);
+        assert_eq!(d_bmssp[2], 3.0);
+        assert!(d_bmssp[3].is_infinite());
+        assert!(d_bmssp[4].is_infinite());
     }
 }

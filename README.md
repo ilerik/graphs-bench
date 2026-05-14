@@ -30,6 +30,8 @@ See [`ALGORITHM.md`](./ALGORITHM.md) for a detailed write-up of the algorithm
 
 ## Running
 
+Rust **≥ 1.85** is required (`edition = "2024"`; see `rust-version` in `Cargo.toml`).
+
 ```bash
 cargo test --release          # correctness tests against Dijkstra
 cargo run  --release          # benchmark sweep

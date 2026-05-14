@@ -18,6 +18,8 @@ for directed real-weighted graphs.
 * `G = (V, E)` directed graph, `n = |V|`, `m = |E|`.
 * Non-negative weight `w_{uv} ≥ 0` on each edge `(u, v) ∈ E`.
 * Source `s ∈ V`; we assume every vertex is reachable from `s`, so `m ≥ n − 1`.
+  (The code leaves `d̂[v] = ∞` for unreachable `v`; `random_graph` adds a spanning
+  out-arborescence from `s` so benchmark instances are all reachable.)
 * `d(v)` = true distance from `s` to `v`.
 * `d̂[v]` = current upper-bound estimate, updated only by edge relaxations.
   Initially `d̂[s] = 0` and `d̂[v] = ∞` for `v ≠ s`.
@@ -35,6 +37,8 @@ model for real-number weights: only additions of weights/distances and
 comparisons of them are allowed.
 
 ## 2. Parameters
+
+As in the paper, `log` denotes **log₂** (matching `sssp_bmssp` in this crate).
 
 Let
 
@@ -267,14 +271,14 @@ The benchmark in this repo measures that gap directly.
 ## 7. Implementation notes (this crate)
 
 * `src/graph.rs` — CSR directed graph with `f64` weights.
-* `src/dijkstra.rs` — textbook Dijkstra using `BinaryHeap<Reverse<…>>`.
+* `src/dijkstra.rs` — textbook Dijkstra using `BinaryHeap` and a min-ordered heap item.
 * `src/dstruct.rs` — block-based partial-sorting data structure `D`, with
   lazy deletion via a `key → best-value` map.
 * `src/bmssp.rs` — `find_pivots`, `base_case`, `bmssp`, and the top-level
   `sssp_bmssp` entry point.
 * `src/random_graph.rs` — Erdős–Rényi-style random directed graphs with a
   guaranteed spanning out-arborescence so every vertex is reachable from `s`.
-* `src/bench.rs` — timed comparisons over a sweep of `(n, avg-degree)`.
+* `src/main.rs` — timed comparisons over a sweep of `(n, avg-degree)`.
 
 For tie-breaking we rely on continuous random weights so the
 `Assumption 2.1` (all path lengths distinct) holds with probability 1. The
