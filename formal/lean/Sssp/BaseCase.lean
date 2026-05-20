@@ -1,10 +1,12 @@
 /-
   Sssp.BaseCase
 
-  Algorithm 2 of the paper (`formal/paper/source/main_result.tex:133`,
-  `BaseCase` Algorithm); implementation at `src/bmssp.rs:201`.
+  **Status: SPECIFICATION ONLY — not the verified algorithm.**
 
-  Pre-conditions:
+  Algorithm 2 of the paper (`formal/paper/source/main_result.tex:133`,
+  `BaseCase` Algorithm); reference implementation at `src/bmssp.rs:201`.
+
+  Pre-conditions (paper):
     • `S = {x}` is a singleton, `x` is complete.
     • Every incomplete vertex `v` with `d(v) < B` has its shortest path
       visiting `x`.
@@ -15,6 +17,18 @@
     • all of `U` is complete,
     • `|U| ≤ 4k * 2^{0·t} = 4k`,
     • if `B' < B` then `|U| ≥ k`.
+
+  This file does **not** verify the bounded-Dijkstra algorithm.  Instead
+  `baseCaseSpec` picks the truncation bound by `Classical.choose` on
+  `exists_baseCase_witness` (an order-theoretic existence lemma proved in
+  `Sssp.Distance.exists_truncation_witness`) and returns the bounded
+  subtree below that cutoff.  All conclusions of `baseCaseSpec_correct`
+  hold by construction; no algorithmic content is verified.
+
+  The honest implementation (a real bounded mini-Dijkstra) will live in
+  `Sssp.Algo.BaseCase`, reusing the verified Dijkstra of
+  `Sssp.Algo.Dijkstra` (Phase 6 of the verification roadmap, see
+  `formal/README.md`).
 -/
 
 import Sssp.Graph
@@ -49,11 +63,14 @@ theorem exists_baseCase_witness
   · simpa [Nat.mul_one] using hSize
   · intro hlt; simpa [Nat.mul_one] using hLower hlt
 
-/-- Noncomputable `baseCase`: chooses the truncation bound by
+/-- **Specification (oracle) of `BaseCase`.**  Picks the truncation bound by
     `Classical.choose` on `exists_baseCase_witness`, then returns the
     bounded subtree below that cutoff and the corresponding `newDist`
-    that equals `trueDist` on the result. -/
-noncomputable def baseCase
+    that equals `trueDist` on the result.
+
+    No mini-Dijkstra is executed — the algorithm is deferred to
+    `Sssp.Algo.BaseCase`. -/
+noncomputable def baseCaseSpec
     (G : Graph n) (s : Fin n)
     [HasDistinctVertexDistances G s]
     (k : ℕ) (B : WithTop NNReal)
@@ -65,18 +82,19 @@ noncomputable def baseCase
     result := result
     newDist := fun v => if v ∈ result then trueDist G s v else dHat v }
 
-/-- **Lemma 3.1, base case (correctness).** -/
-theorem baseCase_correct
+/-- **Lemma 3.1, base case (correctness of the spec).**  Vacuous corollary
+    of the truncation witness; no algorithmic content is verified. -/
+theorem baseCaseSpec_correct
     [HasDistinctLengths G]
     [HasDistinctVertexDistances G s]
     (k : ℕ) (B : WithTop NNReal)
     (dHat : DistEstimate n) (x : Fin n)
     (hSound : Sound G s dHat)
-    (hxComplete : IsComplete G s dHat x)
-    (hCover :
+    (_hxComplete : IsComplete G s dHat x)
+    (_hCover :
       ∀ v, ¬ IsComplete G s dHat v → trueDist G s v < B →
         v ∈ subtree G s x) :
-    let r := baseCase G s k B dHat x
+    let r := baseCaseSpec G s k B dHat x
     -- New estimate still sound:
     Sound G s r.newDist
     -- B' ≤ B:
@@ -93,7 +111,7 @@ theorem baseCase_correct
   -- Unpack the witness produced by `Classical.choose`.
   have h_witness := Classical.choose_spec (exists_baseCase_witness G s k B x)
   obtain ⟨h_le, h_size, h_lower⟩ := h_witness
-  -- Match the `let`-binders inside `baseCase` to the local names below.
+  -- Match the `let`-binders inside `baseCaseSpec` to the local names below.
   set newBound := Classical.choose (exists_baseCase_witness G s k B x) with h_nb
   set resultSet := boundedSubtreeOf G s ({x} : Finset (Fin n)) newBound with h_res
   set newDist' : DistEstimate n :=

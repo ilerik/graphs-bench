@@ -1,8 +1,25 @@
 /-
   Sssp.FindPivots
 
-  Algorithm 1 (FindPivots) and Lemma 3.2 from the paper.
-  Mirrors `find_pivots` at `src/bmssp.rs:81`.
+  **Status: SPECIFICATION ONLY — not the verified algorithm.**
+
+  Algorithm 1 (FindPivots) of the paper does `k` rounds of Bellman–Ford
+  from a frontier `S` and selects pivots from `S` whose tight-edge tree
+  inside the visited set has ≥ `k` vertices.  See `find_pivots` at
+  `src/bmssp.rs:81` for the reference implementation.
+
+  This file does **not** verify that algorithm.  `findPivotsSpec` returns:
+    * if `|Ũ| ≤ k|S| + |S|`: the entire `Ũ` as `visited` and an empty
+      pivot set;
+    * otherwise: the first `k|S| + |S|` elements of `Ũ.toList` as
+      `visited` and `S^*` (the complete vertices of `S`) as pivots.
+  In either branch `newDist` is set to `trueDist` on the visited set, so
+  the spec lemma `findPivotsSpec_correct` holds without any pivot-tree
+  reasoning.
+
+  The honest implementation, with `k`-round Bellman–Ford and the
+  forest-of-tight-edges argument, will live in `Sssp.Algo.FindPivots`
+  (Phase 5 of the verification roadmap, see `formal/README.md`).
 -/
 
 import Sssp.Graph
@@ -21,9 +38,10 @@ structure FindPivotsResult (n : ℕ) where
   visited : Finset (Fin n)
   newDist : DistEstimate n
 
-/-- Noncomputable stub of `FindPivots`.  We give a concrete construction
-    that satisfies Lemma 3.2. -/
-noncomputable def findPivots
+/-- **Specification (oracle) of `FindPivots`.**  Returns the abstract
+    answer that satisfies Lemma 3.2 by construction.  No Bellman–Ford
+    is performed. -/
+noncomputable def findPivotsSpec
     (G : Graph n) (s : Fin n)
     (k : ℕ) (B : WithTop NNReal)
     (dHat : DistEstimate n) (S : Finset (Fin n)) :
@@ -44,16 +62,18 @@ noncomputable def findPivots
       visited := visitedSubset,
       newDist := fun v => if v ∈ visitedSubset then trueDist G s v else dHat v }
 
-/-- **Lemma 3.2** (correctness of `FindPivots`). -/
-theorem findPivots_correct
+/-- **Lemma 3.2 (correctness of the spec).**  Vacuous: `findPivotsSpec`
+    is built to satisfy this conjunction by definition.  See `Sssp.Algo`
+    for the real implementation. -/
+theorem findPivotsSpec_correct
     [HasDistinctLengths G]
     (k : ℕ) (B : WithTop NNReal)
     (dHat : DistEstimate n) (S : Finset (Fin n))
     (hSound : Sound G s dHat)
-    (hCover :
+    (_hCover :
       ∀ v, ¬ IsComplete G s dHat v → trueDist G s v < B →
         v ∈ subtreeOf G s (completeOf G s dHat S)) :
-    let r := findPivots G s k B dHat S
+    let r := findPivotsSpec G s k B dHat S
     Sound G s r.newDist ∧
     r.visited ⊆ S ∪ expectU G s dHat S B ∧
     r.visited.card ≤ k * S.card + S.card ∧
@@ -67,7 +87,7 @@ theorem findPivots_correct
   by_cases heu_small : eu.card ≤ total
   · -- Case 1: |eu| ≤ total — visit all of eu, no pivots
     have hr : r = { pivots := ∅, visited := eu, newDist := fun v => if v ∈ eu then trueDist G s v else dHat v } := by
-      dsimp [r, findPivots]
+      dsimp [r, findPivotsSpec]
       simp [eu, total, heu_small]
     rw [hr]
     refine ⟨?_, ?_, ?_, ?_, ?_⟩
@@ -87,7 +107,7 @@ theorem findPivots_correct
     let takenFinset : Finset (Fin n) := Finset.mk ((eu.toList).take total) (by simpa using hn)
     let newDist' : DistEstimate n := fun v => if v ∈ takenFinset then trueDist G s v else dHat v
     have hr : r = { pivots := completeOf G s dHat S, visited := takenFinset, newDist := newDist' } := by
-      dsimp [r, findPivots, takenFinset, newDist']
+      dsimp [r, findPivotsSpec, takenFinset, newDist']
       simp [eu, total, heu_small]
     rw [hr]
     have h_taken_card : takenFinset.card = total := by
@@ -140,10 +160,11 @@ theorem findPivots_correct
         rw [h_complete_eq]
         exact hx_subtree
 
-/-- **Lemma 3.2 (running time).** -/
-theorem findPivots_time
-    (k : ℕ) (B : WithTop NNReal)
-    (dHat : DistEstimate n) (S : Finset (Fin n)) :
+/-- **Lemma 3.2 (running time)** — not yet stated; running-time
+    formalisation requires the cost monad of Phase 2. -/
+theorem findPivotsSpec_time
+    (_k : ℕ) (_B : WithTop NNReal)
+    (_dHat : DistEstimate n) (_S : Finset (Fin n)) :
     True := by
   trivial
 

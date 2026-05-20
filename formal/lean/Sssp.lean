@@ -1,33 +1,51 @@
 /-
-  Sssp.lean — root module of the formal verification of the
+  Sssp.lean — root module of the formal-verification project for the
   Duan–Mao–Mao–Shu–Yin SSSP algorithm (arXiv:2504.17033).
 
-  This file simply re-exports the per-section modules so that consumers can
-  `import Sssp` and have access to the entire verification.
+  ## Verification status
 
-  Layout (matches the paper's section numbering):
+  This is a **specification + algorithm** layout.  The `Sssp.<X>` modules
+  *specify* the input/output relation of the paper's primitives by
+  oracle definitions whose correctness lemmas are vacuous (the function
+  is *defined* to be its answer).  Real, computable, verified
+  implementations are introduced as `Sssp.Algo.<X>` and proved to satisfy
+  the corresponding spec.
 
-  * `Sssp.Graph`        — directed graphs, edges, weights (constant-degree
-                          assumption is captured but not enforced).
-  * `Sssp.Path`         — paths from `s`, length of a path, Assumption 2.1
-                          (distinct path lengths) as a typeclass-like hypothesis.
-  * `Sssp.Distance`     — true distance `d(v)`, the upper-bound estimate
-                          `d̂[v]`, completeness, the `T(S)` and `T(S^*)`
-                          notations from §3.5 of the paper.
-  * `Sssp.Dijkstra`     — textbook Dijkstra (`src/dijkstra.rs`); used as a
-                          reference implementation and for the equivalence
-                          theorem `dijkstra_eq_bmssp`.
-  * `Sssp.DStruct`      — partial-sorting block-list data structure `D`
-                          (Lemma 3.3 / `src/dstruct.rs`).
-  * `Sssp.FindPivots`   — Algorithm 1 + Lemma 3.2.
-  * `Sssp.BaseCase`     — Algorithm 2 (level-0 of BMSSP).
-  * `Sssp.BMSSP`        — Algorithm 3, Lemma 3.1 (correctness),
-                          Lemma 3.10 (size bound), Lemma 3.12 (running time).
-  * `Sssp.Main`         — top-level theorem `sssp_bmssp_correct` and the
-                          time-complexity corollary.
+  Honest summary as of Phase 0:
 
-  Every theorem statement is filled in; proofs are `sorry` placeholders so the
-  module elaborates as a "blueprint" that the user can attack lemma-by-lemma.
+  ┌─────────────────┬──────────────────────────┬──────────────────────────┐
+  │ Module          │ Status                   │ Real algorithm lives in  │
+  ├─────────────────┼──────────────────────────┼──────────────────────────┤
+  │ Sssp.Graph      │ Honest data definitions   │ —                        │
+  │ Sssp.Path       │ Honest, finished proofs   │ —                        │
+  │ Sssp.Distance   │ Honest, finished proofs   │ —                        │
+  │ Sssp.Dijkstra   │ Spec only (oracle)        │ Sssp.Algo.Dijkstra (WIP) │
+  │ Sssp.DStruct    │ Spec for Pull is oracle   │ Sssp.Algo.DStruct (TBD)  │
+  │ Sssp.FindPivots │ Spec only (oracle)        │ Sssp.Algo.FindPivots (TBD)│
+  │ Sssp.BaseCase   │ Spec only (oracle)        │ Sssp.Algo.BaseCase (TBD) │
+  │ Sssp.BMSSP      │ Spec only (oracle)        │ Sssp.Algo.BMSSP (TBD)    │
+  │ Sssp.Main       │ Spec only (oracle)        │ Sssp.Algo.Main (TBD)     │
+  └─────────────────┴──────────────────────────┴──────────────────────────┘
+
+  See `formal/README.md` for the full verification roadmap.
+
+  ## Layout
+
+  * `Sssp.Graph`        — directed graphs, edges, weights.
+  * `Sssp.Path`         — paths, walks, lengths, Assumption 2.1.
+  * `Sssp.Distance`     — `trueDist`, `Sound`, `IsComplete`,
+                          `subtree`/`expectU`, the order-theoretic
+                          truncation witness.
+  * `Sssp.Dijkstra`     — *spec only.*
+  * `Sssp.DStruct`      — partial-sorting data structure model;
+                          `pullSpec` is an oracle.
+  * `Sssp.FindPivots`   — *spec only.*
+  * `Sssp.BaseCase`     — *spec only.*
+  * `Sssp.BMSSP`        — *spec only.* No actual recursion.
+  * `Sssp.Main`         — *spec only.*
+  * `Sssp.Algo.Dijkstra` — real, computable, verified Dijkstra.
+
+  Every theorem in `Sssp.Algo.<X>` is proven against `<X>Spec`.
 -/
 
 import Sssp.Graph
@@ -39,3 +57,5 @@ import Sssp.FindPivots
 import Sssp.BaseCase
 import Sssp.BMSSP
 import Sssp.Main
+-- Algo.* modules are imported once they exist:
+-- import Sssp.Algo.Dijkstra

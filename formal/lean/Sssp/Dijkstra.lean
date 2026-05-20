@@ -1,9 +1,24 @@
 /-
   Sssp.Dijkstra
 
-  Specification of textbook Dijkstra (`src/dijkstra.rs`). We give it a
-  pure functional signature and state its correctness theorem; this is
-  used as a baseline that BMSSP is later proved to agree with.
+  **Status: SPECIFICATION ONLY — not the verified algorithm.**
+
+  This file states what Dijkstra's algorithm is *supposed* to compute and
+  proves the relaxation soundness lemma.  The function `dijkstraSpec` is
+  defined by `dijkstraSpec G s := trueDist G s` (i.e. it is the answer the
+  algorithm should produce) and `dijkstraSpec_correct` therefore holds by
+  `rfl` — no algorithm is verified by this file.
+
+  The honest, computable implementation of Dijkstra lives in
+  `Sssp.Algo.Dijkstra` and is proven correct against this specification
+  there.
+
+  Naming convention adopted in Phase 0 of the verification roadmap (see
+  `formal/README.md`):
+
+  * `<op>Spec`       — abstract input-output relation, vacuous proof.
+  * `<op>Spec_*`     — corollaries about the spec.
+  * `Sssp.Algo.<Op>` — real algorithm + theorem that it satisfies `<op>Spec`.
 -/
 
 import Sssp.Graph
@@ -14,19 +29,20 @@ namespace Sssp
 
 variable {n : ℕ} (G : Graph n) (s : Fin n)
 
-/-- Output of Dijkstra: the final distance estimate (which we will prove
-    equals `trueDist G s`).  We give a noncomputable oracle definition here;
-    the efficient implementation in `src/dijkstra.rs` can be plugged in later. -/
-noncomputable def dijkstra (G : Graph n) (s : Fin n) : DistEstimate n :=
+/-- **Specification (oracle) of Dijkstra.**  Returns `trueDist G s` by
+    definition; the actual heap-based algorithm lives in `Sssp.Algo.Dijkstra`.
+    This definition is `noncomputable` because `trueDist` is. -/
+noncomputable def dijkstraSpec (G : Graph n) (s : Fin n) : DistEstimate n :=
   trueDist G s
 
-/-- **Correctness of Dijkstra.** Mirrors `dijkstra` in `src/dijkstra.rs:40`. -/
-theorem dijkstra_correct :
-    ∀ v, dijkstra G s v = trueDist G s v := by
+/-- The specification matches `trueDist` by construction.  Holds by `rfl`. -/
+theorem dijkstraSpec_correct :
+    ∀ v, dijkstraSpec G s v = trueDist G s v := by
   intro v; rfl
 
-/-- Soundness invariant of relaxation: relaxing the edge `(u, v)` against the
-    current estimate `d̂` never increases any `d̂[w]`, and preserves `Sound`. -/
+/-- Soundness of the edge-relaxation primitive used by every shortest-path
+    algorithm in this development.  Relaxing the edge `(u, v)` against the
+    current estimate never breaks the invariant `dHat ≥ trueDist`. -/
 theorem relax_sound (dHat : DistEstimate n) (h : Sound G s dHat)
     (u v : Fin n) (w : NNReal) (huv : w ∈ G.edges u v) :
     Sound G s (Function.update dHat v (min (dHat v) (dHat u + (w : NNReal)))) := by

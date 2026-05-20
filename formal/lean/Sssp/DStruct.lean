@@ -1,8 +1,18 @@
 /-
   Sssp.DStruct
 
-  The block-based partial-sorting data structure `D` from Lemma 3.3 of the
-  paper, implemented in Rust at `src/dstruct.rs`.
+  **Status: SPECIFICATION ONLY for `Pull` — not the verified data structure.**
+
+  This file specifies the three operations of the partial-sorting structure
+  `D` from Lemma 3.3.  `insert` and `batchPrepend` are honest, computable
+  operations on the abstract `State n` model and are accompanied by real
+  proofs (`insert_eq`, `batchPrepend_eq`).
+
+  `pullSpec`, by contrast, is a stub that returns an empty key set and a
+  freshly initialised state; its specification lemmas (`pullSpec_size_le`,
+  `pullSpec_separator`) hold vacuously.  The honest block-list
+  implementation will live in `Sssp.Algo.DStruct` (Phase 4 of the
+  verification roadmap, see `formal/README.md`).
 
   We model `D` as a finite multiset of `(key, value)` pairs (with the
   "smallest value per key" semantics) and specify the three operations
@@ -76,34 +86,39 @@ structure PullResult (n : ℕ) where
   /-- New state of `D` after the keys are removed. -/
   state : State n
 
-/-- Spec of `Pull`. We give it a noncomputable functional signature; the
-    block-list implementation in `src/dstruct.rs:191` realises it.
-    
+/-- **Specification (oracle) of `Pull`** — returns up to `M` keys whose
+    values are smallest, plus a separator `x` between the returned set and
+    the rest. The Lean spec is the existence theorem; the concrete return
+    value below is a stub.
+
     This stub returns an empty key set and an empty (freshly initialised)
     state, which satisfies the specification trivially.  The real
-    implementation preserves the block-list invariants. -/
-noncomputable def pull {n : ℕ} (D : State n) : PullResult n :=
+    implementation in `Sssp.Algo.DStruct` will preserve the block-list
+    invariants and is verified against this specification. -/
+noncomputable def pullSpec {n : ℕ} (D : State n) : PullResult n :=
   { keys := ∅,
     sep := D.B,
     state := init D.M D.B }
 
-/-- **Lemma 3.3 (size).** `Pull` returns at most `M` keys. -/
-theorem pull_size_le (D : State n) :
-    (pull D).keys.card ≤ D.M := by
-  simp [pull]
+/-- **Lemma 3.3 (size) — vacuous corollary of `pullSpec`.** `Pull` returns
+    at most `M` keys.  Holds because `pullSpec` returns ∅. -/
+theorem pullSpec_size_le (D : State n) :
+    (pullSpec D).keys.card ≤ D.M := by
+  simp [pullSpec]
 
-/-- **Lemma 3.3 (separator).** Either `D` becomes empty (in which case
-    the separator equals the upper bound `B`) or every value in the
-    *new* `D` is `≥ sep`, and every returned `(k, v)` satisfies
-    `v < sep`. -/
-theorem pull_separator (D : State n) :
-    let r := pull D
+/-- **Lemma 3.3 (separator) — vacuous corollary of `pullSpec`.** Either
+    `D` becomes empty (in which case the separator equals the upper bound
+    `B`) or every value in the *new* `D` is `≥ sep`, and every returned
+    `(k, v)` satisfies `v < sep`.  Holds because `pullSpec` returns the
+    empty state. -/
+theorem pullSpec_separator (D : State n) :
+    let r := pullSpec D
     (r.state.isEmpty ∧ r.sep = D.B) ∨
     ((∀ k v, r.state.data k = some v → r.sep ≤ (v : WithTop NNReal)) ∧
      (∀ k ∈ r.keys, ∀ v, D.data k = some v →
          (v : WithTop NNReal) < r.sep)) := by
   intro r
-  dsimp [r, pull]
+  dsimp [r, pullSpec]
   left
   constructor
   · simp [State.isEmpty, State.size, init]

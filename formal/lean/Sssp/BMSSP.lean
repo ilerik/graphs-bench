@@ -1,18 +1,29 @@
 /-
   Sssp.BMSSP
 
+  **Status: SPECIFICATION ONLY — not the verified algorithm.**
+
   Algorithm 3 of the paper (`formal/paper/source/main_result.tex:170`),
   Lemma 3.1 (correctness, `lemma:bmssp` and `lemma:main-algo-correctness`),
   Lemma 3.10 (size bound, `lemma:size-constraint`),
   and Lemma 3.12 (running time, `lemma:main-algo-time`).
 
-  Implementation at `src/bmssp.rs:265`.
+  Reference implementation at `src/bmssp.rs:265`.
 
-  We model `BMSSP` as a noncomputable function returning a `BMSSPResult`
-  and prove its specification under the standard preconditions.  Both the
-  base case (delegated to `baseCase`) and the inductive step truncate
-  the returned subtree via `exists_truncation_witness`, so the size bound
-  `|U| ≤ 4 * k * 2^{l·t}` holds unconditionally.
+  This file does **not** verify the BMSSP algorithm.  The function
+  `bmsspSpec` is non-recursive in the inductive case (the `_ih` hypothesis
+  is unused below): it picks the truncation bound by `Classical.choose` on
+  `exists_truncation_witness` and returns the bounded subtree below that
+  cutoff.  All conclusions of `bmsspSpec_correct` therefore hold by
+  construction; no algorithmic content is verified.
+
+  In particular **the running-time claim of Lemma 3.12 is not stated
+  anywhere** in this file — it requires the cost monad of Phase 2.
+
+  The honest implementation (well-founded recursion on `l`, `D`-structure
+  loop, Bellman-Ford in `FindPivots`, mini-Dijkstra in `BaseCase`) will
+  live in `Sssp.Algo.BMSSP` (Phase 7 of the verification roadmap, see
+  `formal/README.md`).
 -/
 
 import Sssp.Graph
@@ -45,13 +56,13 @@ structure BMSSPResult (n : ℕ) where
 def BaseCaseResult.toBMSSPResult (r : BaseCaseResult n) : BMSSPResult n :=
   { newBound := r.newBound, result := r.result, newDist := r.newDist }
 
-/-- The recursive procedure. Decreases on `l`.  In the inductive step we
-    use `Classical.choose` on `exists_truncation_witness` (with
-    `M = 2^{(l'+1)·t}`) to pick a truncated bound that satisfies the
-    size constraint.  This makes the size bound part of the
-    *definition* and hence dispenses with truncation reasoning in the
-    correctness proof. -/
-noncomputable def bmssp
+/-- **Specification (oracle) of `BMSSP`.**  Decreases on `l`, but the
+    inductive step does **not** recurse: it picks the truncation bound by
+    `Classical.choose` on `exists_truncation_witness` (with
+    `M = 2^{(l'+1)·t}`) and returns the bounded subtree below that cutoff.
+
+    No `D`-structure, `FindPivots`, or recursion takes place. -/
+noncomputable def bmsspSpec
     [HasDistinctVertexDistances G s]
     (P : Params) :
     ℕ → WithTop NNReal → DistEstimate n → Finset (Fin n) → BMSSPResult n :=
@@ -60,7 +71,7 @@ noncomputable def bmssp
   | 0 =>
       if h : S.Nonempty then
         let x := S.min' h
-        (baseCase G s P.k B dHat x).toBMSSPResult
+        (baseCaseSpec G s P.k B dHat x).toBMSSPResult
       else
         { newBound := B, result := ∅, newDist := dHat }
   | l' + 1 =>
@@ -71,7 +82,9 @@ noncomputable def bmssp
         result := result
         newDist := fun v => if v ∈ result then trueDist G s v else dHat v }
 
-/-- **Lemma 3.1 (Bounded Multi-Source Shortest Path) — correctness.**
+/-- **Lemma 3.1 (Bounded Multi-Source Shortest Path) — correctness of the spec.**
+
+    Vacuous: every conclusion holds by construction of `bmsspSpec`.
 
     Pre-conditions (mirroring the paper):
       • `|S| ≤ 2^{l·t}`,
@@ -87,7 +100,7 @@ noncomputable def bmssp
         branches),
       • either successful execution (`B' = B`) or partial execution
         (`B' < B` with `k * 2^{l·t} ≤ |U|`). -/
-theorem bmssp_correct
+theorem bmsspSpec_correct
     [HasDistinctLengths G]
     [HasDistinctVertexDistances G s]
     (P : Params)
@@ -99,7 +112,7 @@ theorem bmssp_correct
     (hCover :
       ∀ v, ¬ IsComplete G s dHat v → trueDist G s v < B →
         v ∈ subtreeOf G s (completeOf G s dHat S)) :
-    let r := bmssp G s P l B dHat S
+    let r := bmsspSpec G s P l B dHat S
     Sound G s r.newDist
     ∧ r.newBound ≤ B
     ∧ r.result = boundedSubtreeOf G s S r.newBound
@@ -111,7 +124,7 @@ theorem bmssp_correct
   case zero =>
     dsimp
     by_cases hne : S.Nonempty
-    · -- Singleton case: `|S| ≤ 2^0 = 1`, so `S = {x}`; delegate to `baseCase_correct`.
+    · -- Singleton case: `|S| ≤ 2^0 = 1`, so `S = {x}`; delegate to `baseCaseSpec_correct`.
       have h_card : S.card = 1 := by
         have h_card_le : S.card ≤ 1 := by
           have h : 2 ^ (0 * P.t) = 1 := by simp
@@ -133,19 +146,19 @@ theorem bmssp_correct
           exact mem_completeOf_iff.mpr ⟨hu, hxComplete⟩
         rw [h_comp_eq] at h
         simpa [subtreeOf] using h
-      have hbc := baseCase_correct G s P.k B dHat x hSound hxComplete hCover'
+      have hbc := baseCaseSpec_correct G s P.k B dHat x hSound hxComplete hCover'
       have hbmssp_val :
-          bmssp G s P 0 B dHat ({x} : Finset (Fin n))
-            = (baseCase G s P.k B dHat x).toBMSSPResult := by
-        simp [bmssp, hne]
+          bmsspSpec G s P 0 B dHat ({x} : Finset (Fin n))
+            = (baseCaseSpec G s P.k B dHat x).toBMSSPResult := by
+        simp [bmsspSpec, hne]
       rw [hbmssp_val]
       obtain ⟨h_sound, h_le, h_res, h_complete, h_size, h_lower⟩ := hbc
       have h_pow : (2 : ℕ) ^ (0 * P.t) = 1 := by simp
       refine ⟨h_sound, h_le, h_res, h_complete, ?_, ?_⟩
       · rw [h_pow, Nat.mul_one]; exact h_size
-      · by_cases h_eq : (baseCase G s P.k B dHat x).newBound = B
+      · by_cases h_eq : (baseCaseSpec G s P.k B dHat x).newBound = B
         · exact Or.inl h_eq
-        · have h_lt : (baseCase G s P.k B dHat x).newBound < B := lt_of_le_of_ne h_le h_eq
+        · have h_lt : (baseCaseSpec G s P.k B dHat x).newBound < B := lt_of_le_of_ne h_le h_eq
           right
           refine ⟨h_lt, ?_⟩
           rw [h_pow, Nat.mul_one]
@@ -153,8 +166,8 @@ theorem bmssp_correct
     · -- Empty-frontier case.
       have hS_empty : S = ∅ := Finset.not_nonempty_iff_eq_empty.mp hne
       subst hS_empty
-      have h_val : bmssp G s P 0 B dHat ∅ = { newBound := B, result := ∅, newDist := dHat } := by
-        simp [bmssp]
+      have h_val : bmsspSpec G s P 0 B dHat ∅ = { newBound := B, result := ∅, newDist := dHat } := by
+        simp [bmsspSpec]
       rw [h_val]
       have hComplete : SetComplete G s dHat ∅ := by intro v hv; simp at hv
       refine ⟨hSound, le_refl B, ?_, hComplete, ?_, Or.inl rfl⟩
@@ -162,7 +175,8 @@ theorem bmssp_correct
       · simp
 
   case succ l _ih =>
-    -- The inductive step is purely about the truncation witness.
+    -- The inductive step is purely about the truncation witness;
+    -- crucially, `_ih` is *not* used: this function does not recurse.
     let M : ℕ := 2 ^ ((l + 1) * P.t)
     have h_witness_spec :=
       Classical.choose_spec (exists_truncation_witness G s P.k M B S)
@@ -173,9 +187,9 @@ theorem bmssp_correct
     set newDist' : DistEstimate n :=
       fun v => if v ∈ resultSet then trueDist G s v else dHat v with h_nd
     have hr_eq :
-        bmssp G s P (l + 1) B dHat S =
+        bmsspSpec G s P (l + 1) B dHat S =
           { newBound := newBound, result := resultSet, newDist := newDist' } := by
-      dsimp [bmssp]
+      dsimp [bmsspSpec]
     rw [hr_eq]
     refine ⟨?_, h_le, rfl, ?_, ?_, ?_⟩
     · intro v
@@ -193,9 +207,8 @@ theorem bmssp_correct
         refine ⟨h_lt, ?_⟩
         simpa [M] using h_lower h_lt
 
-/-- **Lemma 3.10 (Size constraint).** Direct corollary of `bmssp_correct`:
-    truncation makes the upper bound hold in both branches. -/
-theorem bmssp_size_bound
+/-- **Lemma 3.10 (Size constraint) — corollary of the spec.** -/
+theorem bmsspSpec_size_bound
     [HasDistinctLengths G]
     [HasDistinctVertexDistances G s]
     (P : Params) (l : ℕ) (B : WithTop NNReal)
@@ -206,9 +219,9 @@ theorem bmssp_size_bound
     (hCover :
       ∀ v, ¬ IsComplete G s dHat v → trueDist G s v < B →
         v ∈ subtreeOf G s (completeOf G s dHat S)) :
-    (bmssp G s P l B dHat S).result.card ≤ 4 * P.k * 2 ^ (l * P.t) := by
+    (bmsspSpec G s P l B dHat S).result.card ≤ 4 * P.k * 2 ^ (l * P.t) := by
   obtain ⟨_, _, _, _, h_size, _⟩ :=
-    bmssp_correct G s P l B dHat S hSize hSound hSComplete hCover
+    bmsspSpec_correct G s P l B dHat S hSize hSound hSComplete hCover
   exact h_size
 
 end Sssp
