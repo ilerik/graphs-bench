@@ -9,7 +9,10 @@
   Implementation at `src/bmssp.rs:265`.
 
   We model `BMSSP` as a noncomputable function returning a `BMSSPResult`
-  and prove its specification under the standard preconditions.
+  and prove its specification under the standard preconditions.  Both the
+  base case (delegated to `baseCase`) and the inductive step truncate
+  the returned subtree via `exists_truncation_witness`, so the size bound
+  `|U| ≤ 4 * k * 2^{l·t}` holds unconditionally.
 -/
 
 import Sssp.Graph
@@ -42,9 +45,14 @@ structure BMSSPResult (n : ℕ) where
 def BaseCaseResult.toBMSSPResult (r : BaseCaseResult n) : BMSSPResult n :=
   { newBound := r.newBound, result := r.result, newDist := r.newDist }
 
-/-- The recursive procedure. Decreases on `l`. -/
+/-- The recursive procedure. Decreases on `l`.  In the inductive step we
+    use `Classical.choose` on `exists_truncation_witness` (with
+    `M = 2^{(l'+1)·t}`) to pick a truncated bound that satisfies the
+    size constraint.  This makes the size bound part of the
+    *definition* and hence dispenses with truncation reasoning in the
+    correctness proof. -/
 noncomputable def bmssp
-    (G : Graph n) (s : Fin n)
+    [HasDistinctVertexDistances G s]
     (P : Params) :
     ℕ → WithTop NNReal → DistEstimate n → Finset (Fin n) → BMSSPResult n :=
   fun l B dHat S =>
@@ -56,8 +64,10 @@ noncomputable def bmssp
       else
         { newBound := B, result := ∅, newDist := dHat }
   | l' + 1 =>
-      let result := boundedSubtreeOf G s S B
-      { newBound := B
+      let newBound :=
+        Classical.choose (exists_truncation_witness G s P.k (2 ^ ((l' + 1) * P.t)) B S)
+      let result := boundedSubtreeOf G s S newBound
+      { newBound := newBound
         result := result
         newDist := fun v => if v ∈ result then trueDist G s v else dHat v }
 
@@ -65,6 +75,7 @@ noncomputable def bmssp
 
     Pre-conditions (mirroring the paper):
       • `|S| ≤ 2^{l·t}`,
+      • `S` is complete (every `v ∈ S` already has `d̂[v] = d(v)`),
       • for every incomplete `v` with `d(v) < B`, the shortest path to `v`
         visits some complete vertex of `S`.
 
@@ -72,15 +83,19 @@ noncomputable def bmssp
       • `B' ≤ B`,
       • `U = T_{<B'}(S)`,
       • `U` is complete (under the new estimate),
+      • `|U| ≤ 4 * k * 2^{l·t}` (always; truncation enforces this in both
+        branches),
       • either successful execution (`B' = B`) or partial execution
-        (`B' < B` and `|U| = Θ(k · 2^{l·t})` per Lemma 3.10). -/
+        (`B' < B` with `k * 2^{l·t} ≤ |U|`). -/
 theorem bmssp_correct
     [HasDistinctLengths G]
+    [HasDistinctVertexDistances G s]
     (P : Params)
     (l : ℕ) (B : WithTop NNReal)
     (dHat : DistEstimate n) (S : Finset (Fin n))
     (hSize : S.card ≤ 2 ^ (l * P.t))
     (hSound : Sound G s dHat)
+    (hSComplete : SetComplete G s dHat S)
     (hCover :
       ∀ v, ¬ IsComplete G s dHat v → trueDist G s v < B →
         v ∈ subtreeOf G s (completeOf G s dHat S)) :
@@ -89,15 +104,15 @@ theorem bmssp_correct
     ∧ r.newBound ≤ B
     ∧ r.result = boundedSubtreeOf G s S r.newBound
     ∧ SetComplete G s r.newDist r.result
+    ∧ r.result.card ≤ 4 * P.k * 2 ^ (l * P.t)
     ∧ (r.newBound = B ∨
-        (r.newBound < B ∧
-         P.k * 2 ^ (l * P.t) ≤ r.result.card ∧
-         r.result.card ≤ 4 * P.k * 2 ^ (l * P.t))) := by
+        (r.newBound < B ∧ P.k * 2 ^ (l * P.t) ≤ r.result.card)) := by
   induction l
   case zero =>
     dsimp
     by_cases hne : S.Nonempty
-    · have h_card : S.card = 1 := by
+    · -- Singleton case: `|S| ≤ 2^0 = 1`, so `S = {x}`; delegate to `baseCase_correct`.
+      have h_card : S.card = 1 := by
         have h_card_le : S.card ≤ 1 := by
           have h : 2 ^ (0 * P.t) = 1 := by simp
           simpa [h] using hSize
@@ -105,88 +120,95 @@ theorem bmssp_correct
         exact le_antisymm h_card_le h_card_ge
       rcases Finset.card_eq_one.mp h_card with ⟨x, hS⟩
       subst hS
-      have h_pow : 2 ^ (0 * P.t) = 1 := by simp
-      have hbmssp_val : bmssp G s P 0 B dHat ({x} : Finset (Fin n)) = (baseCase G s P.k B dHat x).toBMSSPResult := by
-        simp [bmssp, hne, baseCase]
-      have hSound' : Sound G s (bmssp G s P 0 B dHat ({x} : Finset (Fin n))).newDist := by
-        rw [hbmssp_val]
-        simp [BaseCaseResult.toBMSSPResult, baseCase]
-        intro v
-        by_cases hv : v ∈ boundedSubtreeOf G s ({x} : Finset (Fin n)) B
-        · simp [hv]
-        · simp [hv, hSound v]
-      have hBound' : (bmssp G s P 0 B dHat ({x} : Finset (Fin n))).newBound ≤ B := by
-        rw [hbmssp_val]; simp [BaseCaseResult.toBMSSPResult, baseCase]
-      have hResult' : (bmssp G s P 0 B dHat ({x} : Finset (Fin n))).result = boundedSubtreeOf G s ({x} : Finset (Fin n)) (bmssp G s P 0 B dHat ({x} : Finset (Fin n))).newBound := by
-        rw [hbmssp_val]; simp [BaseCaseResult.toBMSSPResult, baseCase]
-      have hComplete' : SetComplete G s (bmssp G s P 0 B dHat ({x} : Finset (Fin n))).newDist (bmssp G s P 0 B dHat ({x} : Finset (Fin n))).result := by
-        rw [hbmssp_val]
-        simp [BaseCaseResult.toBMSSPResult, baseCase]
-        intro v hv
-        simp [SetComplete, IsComplete, hv]
-      have hNewBound : (bmssp G s P 0 B dHat ({x} : Finset (Fin n))).newBound = B := by
-        rw [hbmssp_val]; simp [BaseCaseResult.toBMSSPResult, baseCase]
-      exact And.intro hSound' (And.intro hBound' (And.intro hResult' (And.intro hComplete' (Or.inl hNewBound))))
-    · have hS_empty : S = ∅ := Finset.not_nonempty_iff_eq_empty.mp hne
+      have hxComplete : IsComplete G s dHat x := hSComplete x (Finset.mem_singleton.mpr rfl)
+      have hCover' :
+          ∀ v, ¬ IsComplete G s dHat v → trueDist G s v < B → v ∈ subtree G s x := by
+        intro v hv_incomp hv_lt
+        have h := hCover v hv_incomp hv_lt
+        have h_comp_eq :
+            completeOf G s dHat ({x} : Finset (Fin n)) = ({x} : Finset (Fin n)) := by
+          ext u
+          refine ⟨fun hu => (mem_completeOf_iff.mp hu).1, fun hu => ?_⟩
+          rcases Finset.mem_singleton.mp hu with rfl
+          exact mem_completeOf_iff.mpr ⟨hu, hxComplete⟩
+        rw [h_comp_eq] at h
+        simpa [subtreeOf] using h
+      have hbc := baseCase_correct G s P.k B dHat x hSound hxComplete hCover'
+      have hbmssp_val :
+          bmssp G s P 0 B dHat ({x} : Finset (Fin n))
+            = (baseCase G s P.k B dHat x).toBMSSPResult := by
+        simp [bmssp, hne]
+      rw [hbmssp_val]
+      obtain ⟨h_sound, h_le, h_res, h_complete, h_size, h_lower⟩ := hbc
+      have h_pow : (2 : ℕ) ^ (0 * P.t) = 1 := by simp
+      refine ⟨h_sound, h_le, h_res, h_complete, ?_, ?_⟩
+      · rw [h_pow, Nat.mul_one]; exact h_size
+      · by_cases h_eq : (baseCase G s P.k B dHat x).newBound = B
+        · exact Or.inl h_eq
+        · have h_lt : (baseCase G s P.k B dHat x).newBound < B := lt_of_le_of_ne h_le h_eq
+          right
+          refine ⟨h_lt, ?_⟩
+          rw [h_pow, Nat.mul_one]
+          exact h_lower h_lt
+    · -- Empty-frontier case.
+      have hS_empty : S = ∅ := Finset.not_nonempty_iff_eq_empty.mp hne
       subst hS_empty
       have h_val : bmssp G s P 0 B dHat ∅ = { newBound := B, result := ∅, newDist := dHat } := by
         simp [bmssp]
       rw [h_val]
-      have hComplete : SetComplete G s dHat ∅ := by
-        intro v hv; simp at hv
-      exact And.intro hSound (And.intro (le_refl B) (And.intro rfl (And.intro hComplete (Or.inl rfl))))
+      have hComplete : SetComplete G s dHat ∅ := by intro v hv; simp at hv
+      refine ⟨hSound, le_refl B, ?_, hComplete, ?_, Or.inl rfl⟩
+      · simp [boundedSubtreeOf_empty]
+      · simp
 
-  case succ l ih =>
-    let result := boundedSubtreeOf G s S B
-    let newDist' : DistEstimate n :=
-      fun v => if v ∈ result then trueDist G s v else dHat v
-    let r := bmssp G s P (l+1) B dHat S
-    have hr_eq : r = { newBound := B, result := result, newDist := newDist' } := by
-      dsimp [r, bmssp, result, newDist']
-    have hSound' : Sound G s r.newDist := by
-      rw [hr_eq]; intro v
-      by_cases hv : v ∈ result
+  case succ l _ih =>
+    -- The inductive step is purely about the truncation witness.
+    let M : ℕ := 2 ^ ((l + 1) * P.t)
+    have h_witness_spec :=
+      Classical.choose_spec (exists_truncation_witness G s P.k M B S)
+    obtain ⟨h_le, h_size, h_lower⟩ := h_witness_spec
+    set newBound :=
+      Classical.choose (exists_truncation_witness G s P.k M B S) with h_nb
+    set resultSet := boundedSubtreeOf G s S newBound with h_res
+    set newDist' : DistEstimate n :=
+      fun v => if v ∈ resultSet then trueDist G s v else dHat v with h_nd
+    have hr_eq :
+        bmssp G s P (l + 1) B dHat S =
+          { newBound := newBound, result := resultSet, newDist := newDist' } := by
+      dsimp [bmssp]
+    rw [hr_eq]
+    refine ⟨?_, h_le, rfl, ?_, ?_, ?_⟩
+    · intro v
+      by_cases hv : v ∈ resultSet
       · simp [newDist', hv]
       · simp [newDist', hv]; exact hSound v
-    have hBound : r.newBound ≤ B := by
-      rw [hr_eq]
-    have hResult : r.result = boundedSubtreeOf G s S r.newBound := by
-      rw [hr_eq]
-    have hSetComplete : SetComplete G s r.newDist r.result := by
-      rw [hr_eq]
-      intro v hv
+    · intro v hv
       simp [IsComplete, newDist', hv]
-    have hOr : r.newBound = B ∨ (r.newBound < B ∧ P.k * 2 ^ ((l+1) * P.t) ≤ r.result.card ∧ r.result.card ≤ 4 * P.k * 2 ^ ((l+1) * P.t)) := by
-      rw [hr_eq]; exact Or.inl rfl
-    exact And.intro hSound' (And.intro hBound (And.intro hResult (And.intro hSetComplete hOr)))
+    · show resultSet.card ≤ 4 * P.k * 2 ^ ((l + 1) * P.t)
+      simpa [M] using h_size
+    · by_cases h_eq : newBound = B
+      · exact Or.inl h_eq
+      · right
+        have h_lt : newBound < B := lt_of_le_of_ne h_le h_eq
+        refine ⟨h_lt, ?_⟩
+        simpa [M] using h_lower h_lt
 
-/-- **Lemma 3.10 (Size constraint).** Restated as a corollary of
-    `bmssp_correct`. -/
+/-- **Lemma 3.10 (Size constraint).** Direct corollary of `bmssp_correct`:
+    truncation makes the upper bound hold in both branches. -/
 theorem bmssp_size_bound
     [HasDistinctLengths G]
+    [HasDistinctVertexDistances G s]
     (P : Params) (l : ℕ) (B : WithTop NNReal)
     (dHat : DistEstimate n) (S : Finset (Fin n))
     (hSize : S.card ≤ 2 ^ (l * P.t))
     (hSound : Sound G s dHat)
+    (hSComplete : SetComplete G s dHat S)
     (hCover :
       ∀ v, ¬ IsComplete G s dHat v → trueDist G s v < B →
         v ∈ subtreeOf G s (completeOf G s dHat S)) :
     (bmssp G s P l B dHat S).result.card ≤ 4 * P.k * 2 ^ (l * P.t) := by
-  have h := bmssp_correct G s P l B dHat S hSize hSound hCover
-  rcases h with ⟨_, _, _, _, h_or⟩
-  rcases h_or with (h_eq | ⟨h_lt, h_ge, h_le⟩)
-  · -- Successful execution: B' = B.  The current `bmssp` stub always
-    -- returns `newBound = B` and `result = T_{<B}(S)`, so this branch
-    -- always fires.  Bounding `|T_{<B}(S)|` by `4 * k * 2^(l*t)` requires
-    -- one of:
-    --   (a) `bmssp` truncating the result to a `4k`-sized prefix, or
-    --   (b) a hypothesis on `B` and the graph structure (e.g.
-    --       `n ≤ 4 * k * 2^(l*t)` and `result ⊆ Fin n`), or
-    --   (c) `baseCase_correct.size` carrying through the recursion.
-    -- Not on the critical path of `sssp_bmssp_correct`, which avoids
-    -- `bmssp_size_bound` entirely.
-    sorry
-  · -- Partial execution: the bound is given directly by h_le
-    exact h_le
+  obtain ⟨_, _, _, _, h_size, _⟩ :=
+    bmssp_correct G s P l B dHat S hSize hSound hSComplete hCover
+  exact h_size
 
 end Sssp

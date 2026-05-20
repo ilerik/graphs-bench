@@ -20,6 +20,7 @@
 import Sssp.Graph
 import Sssp.Distance
 import Sssp.Dijkstra
+import Mathlib.Data.Finset.Sort
 
 namespace Sssp
 
@@ -31,18 +32,43 @@ structure BaseCaseResult (n : ℕ) where
   result : Finset (Fin n)        -- `U`
   newDist : DistEstimate n
 
+/-- **Existence of the cutoff produced by mini-Dijkstra.**
+
+    Specialisation of `exists_truncation_witness` to `M = 1` and
+    `S = {x}`. -/
+theorem exists_baseCase_witness
+    [HasDistinctVertexDistances G s]
+    (k : ℕ) (B : WithTop NNReal) (x : Fin n) :
+    ∃ (newBound : WithTop NNReal),
+      newBound ≤ B ∧
+      (boundedSubtreeOf G s ({x} : Finset (Fin n)) newBound).card ≤ 4 * k ∧
+      (newBound < B → k ≤ (boundedSubtreeOf G s ({x} : Finset (Fin n)) newBound).card) := by
+  have h := exists_truncation_witness G s k 1 B ({x} : Finset (Fin n))
+  obtain ⟨B', hB'_le, hSize, hLower⟩ := h
+  refine ⟨B', hB'_le, ?_, ?_⟩
+  · simpa [Nat.mul_one] using hSize
+  · intro hlt; simpa [Nat.mul_one] using hLower hlt
+
+/-- Noncomputable `baseCase`: chooses the truncation bound by
+    `Classical.choose` on `exists_baseCase_witness`, then returns the
+    bounded subtree below that cutoff and the corresponding `newDist`
+    that equals `trueDist` on the result. -/
 noncomputable def baseCase
     (G : Graph n) (s : Fin n)
+    [HasDistinctVertexDistances G s]
     (k : ℕ) (B : WithTop NNReal)
     (dHat : DistEstimate n) (x : Fin n) :
     BaseCaseResult n :=
-  { newBound := B
-    result := boundedSubtreeOf G s ({x} : Finset (Fin n)) B
-    newDist := fun v => if v ∈ boundedSubtreeOf G s ({x} : Finset (Fin n)) B then trueDist G s v else dHat v }
+  let newBound := Classical.choose (exists_baseCase_witness G s k B x)
+  let result := boundedSubtreeOf G s ({x} : Finset (Fin n)) newBound
+  { newBound := newBound
+    result := result
+    newDist := fun v => if v ∈ result then trueDist G s v else dHat v }
 
 /-- **Lemma 3.1, base case (correctness).** -/
 theorem baseCase_correct
     [HasDistinctLengths G]
+    [HasDistinctVertexDistances G s]
     (k : ℕ) (B : WithTop NNReal)
     (dHat : DistEstimate n) (x : Fin n)
     (hSound : Sound G s dHat)
@@ -64,29 +90,24 @@ theorem baseCase_correct
     -- Partial-execution lower bound: if `B' < B` then `|U| ≥ k`.
     ∧ (r.newBound < B → k ≤ r.result.card) := by
   intro r
-  dsimp [r, baseCase]
-  refine ⟨?_, le_refl B, rfl, ?_, ?_, ?_⟩
-  · intro v
-    by_cases hv : v ∈ boundedSubtreeOf G s ({x} : Finset (Fin n)) B
-    · simp [hv]
-    · simp [hv, hSound v]
-  · intro v hv
-    simp [IsComplete, hv]
-  · -- Deferred: |U| ≤ 4k.  The current noncomputable stub returns the
-    -- *full* bounded subtree T_{<B}({x}); the paper's algorithm truncates
-    -- this to the k+1 closest vertices via a mini Dijkstra.  Filling this
-    -- sorry requires either:
-    --   (a) replacing the stub with a truncating construction (and proving
-    --       it still satisfies `result = T_{<B'}({x})` for the new B'); or
-    --   (b) strengthening `HasDistinctLengths` to imply distinct vertex
-    --       distances from `s` (current axiom only constrains walks
-    --       between the same pair of vertices).
-    -- Not on the critical path: `sssp_bmssp_correct` does not depend on
-    -- this bound, since the current `bmssp` always reports successful
-    -- execution and `T_{<⊤}({s})` already covers every reachable vertex.
-    sorry
-  · intro h
-    exfalso
-    exact lt_irrefl B h
+  -- Unpack the witness produced by `Classical.choose`.
+  have h_witness := Classical.choose_spec (exists_baseCase_witness G s k B x)
+  obtain ⟨h_le, h_size, h_lower⟩ := h_witness
+  -- Match the `let`-binders inside `baseCase` to the local names below.
+  set newBound := Classical.choose (exists_baseCase_witness G s k B x) with h_nb
+  set resultSet := boundedSubtreeOf G s ({x} : Finset (Fin n)) newBound with h_res
+  set newDist' : DistEstimate n :=
+    fun v => if v ∈ resultSet then trueDist G s v else dHat v with h_nd
+  have h_r : r = { newBound := newBound, result := resultSet, newDist := newDist' } := rfl
+  rw [h_r]
+  refine ⟨?_, h_le, rfl, ?_, h_size, h_lower⟩
+  · -- Sound G s newDist'
+    intro v
+    by_cases hv : v ∈ resultSet
+    · simp [newDist', hv]
+    · simp [newDist', hv]; exact hSound v
+  · -- SetComplete G s newDist' resultSet
+    intro v hv
+    simp [IsComplete, newDist', hv]
 
 end Sssp
