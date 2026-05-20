@@ -15,6 +15,11 @@ See [`ALGORITHM.md`](./ALGORITHM.md) for a detailed write-up of the algorithm
 (notation, parameters, the three sub-routines `FindPivots`, `BaseCase`,
 `BMSSP`, the partial-sorting data structure `D`, and the complexity analysis).
 
+For the **formal verification** in Lean 4 + Mathlib (a blueprint with every
+paper lemma stated; proofs in progress), see [`formal/`](./formal/). The
+arXiv article and its TeX source are vendored under
+[`formal/paper/`](./formal/paper/).
+
 ## Layout
 
 * `src/graph.rs` — CSR-encoded directed graph with `f64` weights.

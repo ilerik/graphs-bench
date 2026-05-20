@@ -1,0 +1,13 @@
+name = "sssp"
+defaultTargets = ["Sssp"]
+
+# Mathlib provides Real, Finset, Multiset, Path-related lemmas, well-founded
+# recursion machinery, etc. Pin to the same Lean 4 release as `lean-toolchain`.
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.29.1"
+
+[[lean_lib]]
+name = "Sssp"
