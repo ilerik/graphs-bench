@@ -19,11 +19,15 @@ import Mathlib.Data.ENNReal.Basic
 import Mathlib.Data.ENNReal.Operations
 import Mathlib.Order.WithBot
 import Mathlib.Data.Finset.Sort
+import Mathlib.Data.Finset.Attach
+import Mathlib.Data.Finset.Lattice.Fold
 import Mathlib.Data.Fintype.Fin
 
 namespace Sssp
 
 open Classical
+
+noncomputable section
 
 /-- True distance from `s` to `v`: the infimum length of any walk `s ⇝ v`,
     or `+∞` if no such walk exists. -/
@@ -92,10 +96,199 @@ abbrev DistEstimate (n : ℕ) := Fin n → WithTop NNReal
 noncomputable def initEstimate {n : ℕ} (s : Fin n) : DistEstimate n :=
   fun v => if v = s then ((0 : NNReal) : WithTop NNReal) else ⊤
 
+theorem initEstimate_self {n : ℕ} (s : Fin n) : initEstimate s s = 0 := by
+  simp [initEstimate]
+
+theorem initEstimate_ne {n : ℕ} (s v : Fin n) (hv : v ≠ s) : initEstimate s v = ⊤ := by
+  simp [initEstimate, hv]
+
+/-- If the true distance is finite, a connecting walk exists. -/
+theorem nonempty_walk_of_trueDist_lt_top {n : ℕ} (G : Graph n) (s u : Fin n)
+    (h : trueDist G s u < ⊤) : Nonempty (Walk G s u) := by
+  by_contra hne
+  have hEmpty : IsEmpty (Walk G s u) := ⟨fun w => hne ⟨w⟩⟩
+  haveI : IsEmpty (Walk G s u) := hEmpty
+  have : trueDist G s u = ⊤ := by
+    dsimp [trueDist]
+    simp [iInf_of_isEmpty]
+  rw [this] at h
+  simp [lt_top_iff_ne_top] at h
+
+/-- Every walk can be loop-trimmed to use at most `n` edges without increasing length. -/
+theorem exists_trimmed_walk {n : ℕ} (G : Graph n) {s u : Fin n} (w : Walk G s u) :
+    ∃ w' : Walk G s u, w'.length ≤ w.length ∧ w'.numEdges ≤ n :=
+  Walk.exists_trimmed_walk w
+
+/-- Trim a walk that already has optimal length down to at most `n` edges. -/
+private theorem exists_shortest_at_trueDist {n : ℕ} {G : Graph n} {s u : Fin n}
+    (w : Walk G s u) (heq : (w.length : WithTop NNReal) = trueDist G s u) :
+    ∃ w' : Walk G s u, (w'.length : WithTop NNReal) = trueDist G s u ∧ w'.numEdges ≤ n := by
+  by_cases hn : w.numEdges ≤ n
+  · exact ⟨w, heq, hn⟩
+  · have hlen : n + 1 ≤ w.vertices.length := by rw [Walk.vertices_length]; omega
+    have hcard : Fintype.card (Fin n) < w.vertices.length := by simp [Fintype.card_fin]; omega
+    have hnodup : ¬ w.vertices.Nodup := by
+      intro H; exact Nat.not_lt_of_ge (List.Nodup.length_le_card (α := Fin n) H) hcard
+    obtain ⟨x, hx⟩ := (List.exists_duplicate_iff_not_nodup).2 hnodup
+    obtain ⟨i, j, hij, hxi, hxj⟩ := Walk.duplicate_exists_lt_getElem hx
+    have hi' : i.val ≤ w.numEdges := by
+      have : i.val < w.numEdges + 1 := by simpa [Walk.vertices_length] using i.isLt
+      exact Nat.lt_succ_iff.mp this
+    have hj' : j.val ≤ w.numEdges := by
+      have : j.val < w.numEdges + 1 := by simpa [Walk.vertices_length] using j.isLt
+      exact Nat.lt_succ_iff.mp this
+    have hdup : Walk.vertexAt w i.val hi' = Walk.vertexAt w j.val hj' := by
+      simp only [Walk.vertexAt, Walk.vertices]
+      exact hxi.trans hxj.symm
+    let w' := Walk.removeLoop w hi' hj' hij hdup
+    have heq' : (w'.length : WithTop NNReal) = trueDist G s u := by
+      apply le_antisymm
+      · rw [← heq]; exact WithTop.coe_le_coe.mpr (Walk.removeLoop_length_le w hi' hj' hij hdup)
+      · exact trueDist_le_walk_length G s u w'
+    obtain ⟨w'', heq'', hn''⟩ := exists_shortest_at_trueDist w' heq'
+    exact ⟨w'', heq'', hn''⟩
+  termination_by w.numEdges
+  decreasing_by
+    exact Walk.removeLoop_numEdges_lt _ _ _ _ _
+
+lemma trueDist_eq_ciInf_edges_le {n : ℕ} {G : Graph n} {s u : Fin n}
+    (hne : Nonempty { w : Walk G s u // w.numEdges ≤ n }) :
+    trueDist G s u =
+      ⨅ w' : { w : Walk G s u // w.numEdges ≤ n }, (w'.val.length : WithTop NNReal) := by
+  apply le_antisymm
+  · dsimp [trueDist]
+    refine le_ciInf fun w' => trueDist_le_walk_length G s u w'.val
+  · dsimp [trueDist]
+    refine le_iInf fun w => ?_
+    obtain ⟨w', hle, hn⟩ := exists_trimmed_walk G w
+    calc
+      (⨅ w' : { w : Walk G s u // w.numEdges ≤ n }, (w'.val.length : WithTop NNReal)) ≤
+          (w'.length : WithTop NNReal) := iInf_le _ (⟨w', hn⟩ : { w : Walk G s u // w.numEdges ≤ n })
+      _ ≤ (w.length : WithTop NNReal) := WithTop.coe_le_coe.mpr hle
+
+private lemma mem_outEdges_iff {n : ℕ} {G : Graph n} {u v : Fin n} {w : NNReal} :
+    (v, w) ∈ G.outEdges u ↔ w ∈ G.edges u v := by
+  simp [Graph.outEdges, Multiset.mem_bind, Multiset.mem_map]
+
+/-- All walks from `s` to `u` using exactly `k` edges. -/
+noncomputable def walksOfLength {n : ℕ} (G : Graph n) (s u : Fin n) : ℕ → Finset (Walk G s u)
+| 0 =>
+  if h : s = u then
+    { (⟨[], WalkValid.nil h⟩ : Walk G s u) }
+  else
+    ∅
+| k + 1 =>
+  (G.outEdges s).toFinset.attach.biUnion fun p =>
+    (walksOfLength G p.1.1 u k).image fun w' =>
+      Walk.consStep p.1.2 w' (mem_outEdges_iff.mp (Multiset.mem_toFinset.mp p.2))
+
+/-- All walks from `s` to `u` using at most `n` edges. -/
+noncomputable def boundedWalks {n : ℕ} (G : Graph n) (s u : Fin n) : Finset (Walk G s u) :=
+  (Finset.range (n + 1)).biUnion fun k => walksOfLength G s u k
+
+private lemma walksOfLength_numEdges {n : ℕ} {G : Graph n} {s u : Fin n} {k : ℕ}
+    {w : Walk G s u} (hw : w ∈ walksOfLength G s u k) : w.numEdges = k := by
+  induction k generalizing w s u with
+  | zero =>
+    by_cases h : s = u
+    · simp [walksOfLength, h, Finset.mem_singleton] at hw
+      cases hw
+      rfl
+    · simp [walksOfLength, h] at hw
+  | succ k ih =>
+    simp only [walksOfLength, Finset.mem_biUnion, Finset.mem_image, true_and] at hw
+    obtain ⟨p, _, w', hw', rfl⟩ := hw
+    dsimp [Walk.consStep, Walk.numEdges]
+    exact congrArg Nat.succ (ih (s := p.1.1) hw')
+
+private lemma mem_walksOfLength_of_numEdges {n : ℕ} {G : Graph n} {s u : Fin n} {k : ℕ}
+    (w : Walk G s u) (hk : w.numEdges = k) : w ∈ walksOfLength G s u k := by
+  induction k generalizing w s u with
+  | zero =>
+    rcases w with ⟨steps, valid⟩
+    simp [Walk.numEdges] at hk
+    cases valid with
+    | nil h =>
+      simp [walksOfLength, h, Finset.mem_singleton]
+    | cons _ _ _ _ _ _ => simp [Walk.numEdges] at hk
+  | succ k ih =>
+    rcases w with ⟨steps, valid⟩
+    cases valid with
+    | nil => simp [Walk.numEdges] at hk
+    | cons _ v w₀ rest h_edge h_tail =>
+      simp only [Walk.numEdges] at hk
+      have hk' : rest.length = k := by simp [Walk.numEdges] at hk; omega
+      let w' : Walk G v u := ⟨rest, h_tail⟩
+      have hw' : w' ∈ walksOfLength G v u k := ih w' hk'
+      have hout : (v, w₀) ∈ (G.outEdges s).toFinset := by
+        simpa [Multiset.mem_toFinset, mem_outEdges_iff] using h_edge
+      let edge : ↥(G.outEdges s).toFinset := ⟨(v, w₀), hout⟩
+      simp only [walksOfLength, Finset.mem_biUnion, Finset.mem_image, true_and]
+      refine ⟨edge, ?_, w', hw', rfl⟩
+      exact Finset.mem_attach _ edge
+
+private lemma mem_boundedWalks_of_numEdges_le {n : ℕ} {G : Graph n} {s u : Fin n}
+    {w : Walk G s u} (hk : w.numEdges ≤ n) : w ∈ boundedWalks G s u := by
+  simp [boundedWalks, Finset.mem_biUnion, Finset.mem_range]
+  exact ⟨w.numEdges, Nat.lt_succ_of_le hk, mem_walksOfLength_of_numEdges w rfl⟩
+
+private lemma boundedWalks_nonempty {n : ℕ} {G : Graph n} {s u : Fin n}
+    (h : trueDist G s u < ⊤) : (boundedWalks G s u).Nonempty := by
+  obtain ⟨w0⟩ := nonempty_walk_of_trueDist_lt_top G s u h
+  obtain ⟨w', _, hn⟩ := exists_trimmed_walk G w0
+  exact ⟨w', mem_boundedWalks_of_numEdges_le hn⟩
+
+private lemma trueDist_eq_inf_boundedWalks {n : ℕ} {G : Graph n} {s u : Fin n}
+    (h : trueDist G s u < ⊤) :
+    trueDist G s u =
+      (boundedWalks G s u).inf' (boundedWalks_nonempty h)
+        (fun w => (w.length : WithTop NNReal)) := by
+  obtain ⟨w0⟩ := nonempty_walk_of_trueDist_lt_top G s u h
+  obtain ⟨w', _, hn'⟩ := exists_trimmed_walk G w0
+  have hne : Nonempty { w : Walk G s u // w.numEdges ≤ n } := ⟨⟨w', hn'⟩⟩
+  rw [trueDist_eq_ciInf_edges_le hne]
+  apply le_antisymm
+  · rw [Finset.le_inf'_iff]
+    intro w hw
+    have hn : w.numEdges ≤ n := by
+      simp [boundedWalks, Finset.mem_biUnion, Finset.mem_range] at hw
+      obtain ⟨k, hk, hwk⟩ := hw
+      simpa [← walksOfLength_numEdges hwk] using Nat.le_of_lt_succ hk
+    exact iInf_le (f := fun (w : { w : Walk G s u // w.numEdges ≤ n }) =>
+      (w.val.length : WithTop NNReal)) ⟨w, hn⟩
+  · refine le_ciInf (f := fun (w : { w : Walk G s u // w.numEdges ≤ n }) =>
+      (w.val.length : WithTop NNReal)) fun w =>
+    Finset.inf'_le _ (mem_boundedWalks_of_numEdges_le w.property)
+
+/-- Shortest distances are achieved by some walk using at most `n` edges. -/
+theorem exists_shortest_bounded_walk {n : ℕ} (G : Graph n) (s u : Fin n)
+    (h : trueDist G s u < ⊤) :
+    ∃ w : Walk G s u, (w.length : WithTop NNReal) = trueDist G s u ∧ w.numEdges ≤ n := by
+  have hne := boundedWalks_nonempty h
+  obtain ⟨w, hw, hinf⟩ :=
+    Finset.exists_mem_eq_inf' (s := boundedWalks G s u) (H := hne)
+      (f := fun w => (w.length : WithTop NNReal))
+  have heq : (w.length : WithTop NNReal) = trueDist G s u := by
+    rw [← hinf, trueDist_eq_inf_boundedWalks h]
+  have hn : w.numEdges ≤ n := by
+    simp [boundedWalks, Finset.mem_biUnion, Finset.mem_range] at hw
+    obtain ⟨k, hk, hwk⟩ := hw
+    simpa [← walksOfLength_numEdges hwk] using Nat.le_of_lt_succ hk
+  exact ⟨w, heq, hn⟩
+
 /-- Soundness invariant maintained throughout the algorithm:
     `d̂[v] ≥ d(v)` for every `v`. -/
 def Sound {n : ℕ} (G : Graph n) (s : Fin n) (dHat : DistEstimate n) : Prop :=
   ∀ v, trueDist G s v ≤ dHat v
+
+/-- The initial estimate is sound: `d(v) ≤ d̂[v]` for every vertex. -/
+theorem initEstimate_sound {n : ℕ} (G : Graph n) (s : Fin n) : Sound G s (initEstimate s) := by
+  intro v
+  by_cases hv : v = s
+  · subst hv
+    rw [initEstimate_self, trueDist_self]
+  · rw [initEstimate_ne _ _ hv]
+    exact le_top
 
 /-- A vertex `v` is **complete** w.r.t. `dHat` iff its current estimate
     equals its true distance. -/
@@ -276,5 +469,7 @@ theorem exists_truncation_witness {n : ℕ} (G : Graph n) (s : Fin n)
     refine ⟨B', hB'_le_B, ?_, ?_⟩
     · rw [h_card_BS]; exact h_kM_le_4kM
     · intro _; rw [h_card_BS]
+
+end
 
 end Sssp

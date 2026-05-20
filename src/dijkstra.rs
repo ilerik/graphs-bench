@@ -58,3 +58,57 @@ pub fn dijkstra(g: &Graph, source: usize) -> Vec<f64> {
     }
     dist
 }
+
+#[cfg(test)]
+mod fixture_tests {
+    use super::*;
+    use crate::graph::Graph;
+    use serde::Deserialize;
+    use std::fs;
+
+    #[derive(Debug, Deserialize)]
+    struct Fixture {
+        name: String,
+        n: usize,
+        source: usize,
+        edges: Vec<(u32, u32, f64)>,
+        expected_dist: Vec<Option<f64>>,
+    }
+
+    fn assert_distances_match(got: &[f64], expected: &[Option<f64>]) {
+        assert_eq!(got.len(), expected.len());
+        for (i, (g, e)) in got.iter().zip(expected.iter()).enumerate() {
+            match e {
+                None => assert!(g.is_infinite(), "vertex {i}: expected inf, got {g}"),
+                Some(y) => {
+                    let diff = (g - y).abs();
+                    assert!(
+                        diff < 1e-9 || diff < 1e-9 * g.abs().max(y.abs()),
+                        "vertex {i}: got {g}, expected {y}"
+                    );
+                }
+            }
+        }
+    }
+
+    fn load_fixture(path: &str) -> Fixture {
+        let text = fs::read_to_string(path).unwrap_or_else(|e| panic!("read {path}: {e}"));
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("parse {path}: {e}"))
+    }
+
+    #[test]
+    fn shared_json_fixtures() {
+        for path in [
+            "formal/fixtures/dijkstra/tiny_chain.json",
+            "formal/fixtures/dijkstra/diamond_with_ties.json",
+            "formal/fixtures/dijkstra/unreachable_vertices.json",
+            "formal/fixtures/dijkstra/single_vertex.json",
+        ] {
+            let fx = load_fixture(path);
+            let edges: Vec<(u32, u32, f64)> = fx.edges;
+            let g = Graph::from_edges(fx.n, &edges);
+            let got = dijkstra(&g, fx.source);
+            assert_distances_match(&got, &fx.expected_dist);
+        }
+    }
+}

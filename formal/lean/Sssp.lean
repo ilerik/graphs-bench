@@ -19,7 +19,9 @@
   │ Sssp.Graph      │ Honest data definitions   │ —                        │
   │ Sssp.Path       │ Honest, finished proofs   │ —                        │
   │ Sssp.Distance   │ Honest, finished proofs   │ —                        │
-  │ Sssp.Dijkstra   │ Spec only (oracle)        │ Sssp.Algo.Dijkstra (WIP) │
+  │ Sssp.Dijkstra   │ Spec + shared relax lemmas    │ Sssp.Algo.Dijkstra       │
+  │ Sssp.Algo.Dijkstra │ Verified (`dijkstra_correct`) │ —                     │
+  │ Sssp.Refine.Dijkstra │ Float/CSR heap model        │ —                        │
   │ Sssp.DStruct    │ Spec for Pull is oracle   │ Sssp.Algo.DStruct (TBD)  │
   │ Sssp.FindPivots │ Spec only (oracle)        │ Sssp.Algo.FindPivots (TBD)│
   │ Sssp.BaseCase   │ Spec only (oracle)        │ Sssp.Algo.BaseCase (TBD) │
@@ -57,5 +59,5 @@ import Sssp.FindPivots
 import Sssp.BaseCase
 import Sssp.BMSSP
 import Sssp.Main
--- Algo.* modules are imported once they exist:
--- import Sssp.Algo.Dijkstra
+import Sssp.Algo.Dijkstra
+import Sssp.Refine.Dijkstra

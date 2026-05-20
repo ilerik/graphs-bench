@@ -27,13 +27,14 @@ algorithmic content is not yet verified**.  The current architecture is a
 | `Sssp.Graph`       | Honest data definitions                          | n/a                       |
 | `Sssp.Path`        | Honest, finished proofs (`Walk`, `length_append`)| n/a                       |
 | `Sssp.Distance`    | Honest, finished proofs                          | `trueDist_triangle`, `exists_truncation_witness` |
-| `Sssp.Dijkstra`    | **Spec only.** `dijkstraSpec := trueDist G s`     | none                      |
+| `Sssp.Dijkstra`    | Spec + shared lemmas (`relax_sound`, …)           | none (spec oracle)        |
 | `Sssp.DStruct`     | **`pullSpec` is an oracle** returning ∅           | `insert_eq`, `batchPrepend_eq` |
 | `Sssp.FindPivots`  | **Spec only.** No Bellman-Ford performed          | none                      |
 | `Sssp.BaseCase`    | **Spec only.** No mini-Dijkstra performed         | none                      |
 | `Sssp.BMSSP`       | **Spec only.** Inductive step does not recurse    | none                      |
 | `Sssp.Main`        | **Spec only.** Vacuous "successful execution"     | none                      |
-| `Sssp.Algo.Dijkstra` | *Phase 3, in progress.*                         | real heap-based Dijkstra  |
+| `Sssp.Algo.Dijkstra` | **Verified (Phase 3).** `dijkstra_correct`       | `n`-round relaxation      |
+| `Sssp.Refine.Dijkstra` | Operational Float/CSR/lazy-heap model           | mirrors `src/dijkstra.rs` |
 | `Sssp.Algo.DStruct`  | TBD (Phase 4).                                  | block-list with amortised costs |
 | `Sssp.Algo.FindPivots` | TBD (Phase 5).                                | k-round Bellman-Ford      |
 | `Sssp.Algo.BaseCase`   | TBD (Phase 6).                                | bounded mini-Dijkstra     |
@@ -107,7 +108,7 @@ dependency, so the natural order of attack is bottom-up:
 | 0     | Honest reset: rename oracles to `<x>Spec`, document status            | done        |
 | 1     | Foundation hardening (`Walk`, `Distance`, log conventions)            | 1 week      |
 | 2     | Cost-counting monad `CostM`                                           | 2 weeks     |
-| 3     | `Sssp.Algo.Dijkstra`: real verified implementation + cost              | 1–2 weeks   |
+| 3     | `Sssp.Algo.Dijkstra`: verified relaxation + Refine model + fixtures   | done        |
 | 4     | `Sssp.Algo.DStruct`: block-list, amortised costs                       | 3–4 weeks   |
 | 5     | `Sssp.Algo.FindPivots`: Bellman-Ford + Lemma 3.2                       | 3 weeks     |
 | 6     | `Sssp.Algo.BaseCase`: bounded mini-Dijkstra + Lemma 3.1 base           | 1–2 weeks   |
@@ -135,6 +136,14 @@ discharged in Phase 7.
 | `Sssp.BaseCase`            | Algorithm 2 (`main_result.tex` ll. 133–167) — spec only   | `base_case` (bmssp.rs)   |
 | `Sssp.BMSSP`               | Algorithm 3 + Lemmas 3.1, 3.10 — spec only; Lemma 3.12 absent | `bmssp` (bmssp.rs)   |
 | `Sssp.Main`                | "Top-level call" (`main_result.tex` line 47) — spec only  | `sssp_bmssp` (bmssp.rs)  |
+
+## Phase 3 fixtures (Dijkstra cross-check)
+
+Shared JSON vectors live under `formal/fixtures/dijkstra/` (`tiny_chain.json`,
+`diamond_with_ties.json`, `unreachable_vertices.json`, `single_vertex.json`).
+Rust validates them via `cargo test shared_json_fixtures` in `src/dijkstra.rs`
+(1e-9 tolerance).  The verified Lean algorithm is `Sssp.Algo.dijkstra`; the
+lazy heap operational model is `Sssp.Refine.dijkstra` on `RustGraph`.
 
 ## Re-fetching the paper
 

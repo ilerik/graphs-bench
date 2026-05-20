@@ -1,17 +1,14 @@
 /-
   Sssp.Dijkstra
 
-  **Status: SPECIFICATION ONLY — not the verified algorithm.**
+  Specification of Dijkstra's output plus shared lemmas used by the verified
+  implementation in `Sssp.Algo.Dijkstra` (`relax_sound`, `initEstimate_sound`
+  in `Sssp.Distance`).
 
-  This file states what Dijkstra's algorithm is *supposed* to compute and
-  proves the relaxation soundness lemma.  The function `dijkstraSpec` is
-  defined by `dijkstraSpec G s := trueDist G s` (i.e. it is the answer the
-  algorithm should produce) and `dijkstraSpec_correct` therefore holds by
-  `rfl` — no algorithm is verified by this file.
-
-  The honest, computable implementation of Dijkstra lives in
-  `Sssp.Algo.Dijkstra` and is proven correct against this specification
-  there.
+  The function `dijkstraSpec` is defined by `dijkstraSpec G s := trueDist G s`
+  (i.e. it is the answer the algorithm should produce); its vacuous
+  `dijkstraSpec_correct` holds by `rfl`.  Real algorithmic correctness is
+  proved in `Sssp.Algo.Dijkstra`.
 
   Naming convention adopted in Phase 0 of the verification roadmap (see
   `formal/README.md`):
@@ -24,10 +21,24 @@
 import Sssp.Graph
 import Sssp.Distance
 import Mathlib.Data.NNReal.Basic
+import Mathlib.Data.Multiset.Basic
+import Mathlib.Data.Multiset.MapFold
 
 namespace Sssp
 
 variable {n : ℕ} (G : Graph n) (s : Fin n)
+
+/-- Relax the edge `(u, v)` with weight `w` in the current estimate. -/
+def relaxEdge (dHat : DistEstimate n) (u v : Fin n) (w : NNReal) : DistEstimate n :=
+  Function.update dHat v (min (dHat v) (dHat u + (w : WithTop NNReal)))
+
+/-- Relax all out-edges of `u`. -/
+noncomputable def relaxOutEdges (G : Graph n) (dHat : DistEstimate n) (u : Fin n) : DistEstimate n :=
+  (G.outEdges u).toList.foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat
+
+lemma mem_outEdges_iff {u v : Fin n} {w : NNReal} :
+    (v, w) ∈ G.outEdges u ↔ w ∈ G.edges u v := by
+  simp [Graph.outEdges, Multiset.mem_bind, Multiset.mem_map]
 
 /-- **Specification (oracle) of Dijkstra.**  Returns `trueDist G s` by
     definition; the actual heap-based algorithm lives in `Sssp.Algo.Dijkstra`.
@@ -72,5 +83,24 @@ theorem relax_sound (dHat : DistEstimate n) (h : Sound G s dHat)
       simp [hx]
     rw [h_upd]
     exact h x
+
+/-- Soundness of relaxing every out-edge of `u`. -/
+theorem relaxOutEdges_sound (dHat : DistEstimate n) (h : Sound G s dHat) (u : Fin n) :
+    Sound G s (relaxOutEdges G dHat u) := by
+  unfold relaxOutEdges
+  suffices hfold : ∀ (l : List (Fin n × NNReal)) (dHat : DistEstimate n),
+      Sound G s dHat → (∀ p, p ∈ l → p ∈ G.outEdges u) →
+      Sound G s (l.foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat) by
+    exact hfold (G.outEdges u).toList dHat h (fun p hp => Multiset.mem_toList.mp hp)
+  intro l dHat h hl
+  induction l generalizing dHat with
+  | nil =>
+    simpa [List.foldl] using h
+  | cons p l ih =>
+    simp only [List.foldl]
+    have hmem : p.2 ∈ G.edges u p.1 :=
+      (mem_outEdges_iff (G := G) (u := u)).mp (hl p (List.Mem.head l))
+    have h' := relax_sound G s dHat h u p.1 p.2 hmem
+    exact ih (relaxEdge dHat u p.1 p.2) h' (fun q hq => hl q (List.mem_cons.mpr (Or.inr hq)))
 
 end Sssp
