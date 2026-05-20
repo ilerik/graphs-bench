@@ -2,8 +2,8 @@
   Sssp.Refine.Bridge
 
   Align CSR `RustGraph` topology with verified `Graph n` on shared fixture
-  edge lists.  Full Refine ≡ Algo equivalence is deferred to Phase 9; here we
-  record decidable checks that both sides encode the same edges.
+  edge lists.  **Regression checks only** — the general bridge for all inputs
+  is Phase 3b; see `formal/FUTURE_WORK.md`.
 -/
 
 import Mathlib

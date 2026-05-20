@@ -27,16 +27,11 @@ theorem refine_dijkstra_all_fixtures :
   native_decide
 
 /-!
-  **Phase 3 Dijkstra is complete** when the following hold jointly:
+  Phase 3 regression summary (fixtures only).
 
-  1. `dijkstra_verified` — `Sssp.Algo.dijkstra` = `trueDist` (proved).
-  2. `refine_dijkstra_all_fixtures` — `Sssp.Refine.dijkstra` matches JSON vectors.
-  3. `Sssp.Refine.Bridge` — CSR/multiset topology aligned on fixtures.
-  4. Rust `cargo test shared_json_fixtures` — same JSON files (see CI).
-
-  The lazy-heap step lemmas live in `Sssp.Refine.Dijkstra`
-  (`dijkstraStep_stale`, `dijkstraStep_fresh`).  A general Refine ≡ Algo
-  refinement proof remains Phase 9 work.
+  This module records what CI checks; it is **not** the all-inputs refinement
+  proof.  Phase 3b (Refine ≡ Algo for every valid input) is the gate before
+  Phase 4+ — see `formal/FUTURE_WORK.md`.
 -/
 
 end Fixtures

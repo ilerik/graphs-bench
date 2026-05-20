@@ -20,10 +20,11 @@
   │ Sssp.Path       │ Honest, finished proofs   │ —                        │
   │ Sssp.Distance   │ Honest, finished proofs   │ —                        │
   │ Sssp.Dijkstra   │ Spec + shared relax lemmas    │ Sssp.Algo.Dijkstra       │
-  │ Sssp.Algo.Dijkstra │ Verified (`dijkstra_correct`) — Phase 3 complete │ —                     │
-  │ Sssp.Refine.Dijkstra │ Float/CSR heap model + step lemmas      │ —                        │
-  │ Sssp.Refine.Bridge │ CSR ↔ graph alignment (fixtures)        │ —                        │
-  │ Sssp.Fixtures.*  │ Regression guards + completeness summary  │ —                        │
+  │ Sssp.Algo.Dijkstra │ Verified (`dijkstra_correct`)           │ —                     │
+  │ Sssp.Refine.Dijkstra │ Float/CSR heap + step lemmas          │ —                        │
+  │ Sssp.Refine.Bridge │ Fixture regression (not proof target)   │ —                        │
+  │ Sssp.Fixtures.*  │ CI regression (Phase 3b gate pending)     │ —                        │
+  │ **Phase 3b**     │ Refine ≡ Algo, all inputs — **next**      │ blocks Phase 4+          │
   │ Sssp.DStruct    │ Spec for Pull is oracle   │ Sssp.Algo.DStruct (TBD)  │
   │ Sssp.FindPivots │ Spec only (oracle)        │ Sssp.Algo.FindPivots (TBD)│
   │ Sssp.BaseCase   │ Spec only (oracle)        │ Sssp.Algo.BaseCase (TBD) │

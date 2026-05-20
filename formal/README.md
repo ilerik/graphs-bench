@@ -35,8 +35,8 @@ algorithmic content is not yet verified**.  The current architecture is a
 | `Sssp.Main`        | **Spec only.** Vacuous "successful execution"     | none                      |
 | `Sssp.Algo.Dijkstra` | **Verified (Phase 3, complete).** `dijkstra_correct` | `n`-round relaxation      |
 | `Sssp.Refine.Dijkstra` | Operational Float/CSR/lazy-heap model + step lemmas   | mirrors `src/dijkstra.rs` |
-| `Sssp.Refine.Bridge` | CSR ↔ multiset alignment on fixtures                  | —                         |
-| `Sssp.Fixtures.*`    | `#guard` / `native_decide` regression on JSON vectors | —                         |
+| `Sssp.Refine.Bridge` | CSR ↔ graph checks on fixtures (**regression only**)  | —                         |
+| `Sssp.Fixtures.*`    | `#guard` / CI regression (**not the proof target**)   | —                         |
 | `Sssp.Algo.DStruct`  | TBD (Phase 4).                                  | block-list with amortised costs |
 | `Sssp.Algo.FindPivots` | TBD (Phase 5).                                | k-round Bellman-Ford      |
 | `Sssp.Algo.BaseCase`   | TBD (Phase 6).                                | bounded mini-Dijkstra     |
@@ -110,13 +110,14 @@ dependency, so the natural order of attack is bottom-up:
 | 0     | Honest reset: rename oracles to `<x>Spec`, document status            | done        |
 | 1     | Foundation hardening (`Walk`, `Distance`, log conventions)            | 1 week      |
 | 2     | Cost-counting monad `CostM`                                           | 2 weeks     |
-| 3     | `Sssp.Algo.Dijkstra`: verified relaxation + Refine + fixtures + bridge | done        |
-| 4     | `Sssp.Algo.DStruct`: block-list, amortised costs                       | 3–4 weeks   |
-| 5     | `Sssp.Algo.FindPivots`: Bellman-Ford + Lemma 3.2                       | 3 weeks     |
-| 6     | `Sssp.Algo.BaseCase`: bounded mini-Dijkstra + Lemma 3.1 base           | 1–2 weeks   |
-| 7     | `Sssp.Algo.BMSSP`: well-founded recursion, Lemmas 3.1, 3.10, 3.12       | 4–6 weeks   |
-| 8     | `Sssp.Algo.Main`: top-level + equivalence theorem                      | 1 week      |
-| 9     | Rust↔Lean refinement (extraction or hand-translated refinement proof)  | 4–8 weeks   |
+| 3     | `Sssp.Algo.Dijkstra`: verified relaxation + Refine model + fixtures | done        |
+| 3b    | **Dijkstra refinement: Refine ≡ Algo for all inputs** (gate)          | in progress |
+| 4     | `Sssp.Algo.DStruct`: block-list, amortised costs                       | *deferred*  |
+| 5     | `Sssp.Algo.FindPivots`: Bellman-Ford + Lemma 3.2                       | *deferred*  |
+| 6     | `Sssp.Algo.BaseCase`: bounded mini-Dijkstra + Lemma 3.1 base           | *deferred*  |
+| 7     | `Sssp.Algo.BMSSP`: well-founded recursion, Lemmas 3.1, 3.10, 3.12       | *deferred*  |
+| 8     | `Sssp.Algo.Main`: top-level + equivalence theorem                      | *deferred*  |
+| 9     | Rust↔Lean refinement (extraction or hand-translated refinement proof)  | *deferred*  |
 | 10    | Rust polish: LICENSE, Cargo metadata, CI, criterion benchmarks          | 1 week      |
 | 11    | Paper writing + submission (FV venue + SWE venue)                      | 4–8 weeks   |
 
@@ -139,18 +140,18 @@ discharged in Phase 7.
 | `Sssp.BMSSP`               | Algorithm 3 + Lemmas 3.1, 3.10 — spec only; Lemma 3.12 absent | `bmssp` (bmssp.rs)   |
 | `Sssp.Main`                | "Top-level call" (`main_result.tex` line 47) — spec only  | `sssp_bmssp` (bmssp.rs)  |
 
-## Phase 3 (Dijkstra — complete)
+## Phase 3 (Dijkstra) and Phase 3b (refinement gate)
 
-Shared JSON vectors live under `formal/fixtures/dijkstra/`.  Three layers agree
-on these inputs:
+**Done (Phase 3):** verified `Sssp.Algo.dijkstra` (`dijkstra_correct`), operational
+`Sssp.Refine.dijkstra`, fixture regression (`Sssp.Fixtures.*`, CI, Rust tests).
 
-1. **Verified** — `Sssp.Algo.dijkstra_correct` (`dijkstra` = `trueDist`).
-2. **Operational** — `Sssp.Refine.dijkstra` + `#guard` tests in `Sssp.Fixtures`.
-3. **Rust** — `cargo test shared_json_fixtures` (1e-9 tolerance).
+**Next (Phase 3b — blocks Phase 4+):** prove Refine ≡ Algo for **all inputs**
+(general `RustGraph` → `Graph n` bridge + simulation proof).  See
+`formal/FUTURE_WORK.md` for the proof plan.  No new paper-module proofs until
+this lands.
 
-CSR/multiset alignment on fixtures is in `Sssp.Refine.Bridge`; the joint
-summary is `Sssp.Fixtures.Correctness`.  Run `./formal/scripts/check-fixtures.sh`
-or CI (`.github/workflows/ci.yml`).  Next roadmap phase: DStruct (Phase 4).
+Fixtures remain a regression harness only; passing CI does not close Phase 3b.
+Run `./formal/scripts/check-fixtures.sh` while refinement work is in progress.
 
 ## Re-fetching the paper
 
