@@ -23,6 +23,7 @@
   │ Sssp.Algo.Dijkstra │ Verified (`dijkstra_correct`)           │ —                     │
   │ Sssp.Refine.Dijkstra │ Float/CSR heap + step lemmas          │ —                        │
   │ Sssp.Refine.Bridge │ Fixture regression (not proof target)   │ —                        │
+  │ Sssp.Refine.GraphBridge │ Phase 3b CSR→Graph bridge (WIP)      │ —                        │
   │ Sssp.Fixtures.*  │ CI regression (Phase 3b gate pending)     │ —                        │
   │ **Phase 3b**     │ Refine ≡ Algo, all inputs — **next**      │ blocks Phase 4+          │
   │ Sssp.DStruct    │ Spec for Pull is oracle   │ Sssp.Algo.DStruct (TBD)  │
@@ -64,3 +65,4 @@ import Sssp.BMSSP
 import Sssp.Main
 import Sssp.Algo.Dijkstra
 import Sssp.Refine.Dijkstra
+import Sssp.Refine.GraphBridge
