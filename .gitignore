@@ -1,1 +1,11 @@
 /target
+
+# Lean / Lake build artefacts (formal verification project under formal/lean/)
+formal/lean/.lake/
+formal/lean/lake-packages/
+formal/lean/lean_packages/
+formal/lean/build/
+*.olean
+
+# Vendored lean4-skills clone (re-cloneable from upstream; see .opencode/opencode.json)
+.opencode/lean4-skills/
