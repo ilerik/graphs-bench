@@ -21,7 +21,8 @@
   │ Sssp.Distance   │ Honest, finished proofs   │ —                        │
   │ Sssp.Dijkstra   │ Spec + shared relax lemmas    │ Sssp.Algo.Dijkstra       │
   │ Sssp.Algo.Dijkstra │ Verified (`dijkstra_correct`) │ —                     │
-  │ Sssp.Refine.Dijkstra │ Float/CSR heap model        │ —                        │
+  │ Sssp.Refine.Dijkstra │ Float/CSR heap model + step lemmas      │ —                        │
+  │ Sssp.Fixtures.Dijkstra │ `#eval` smoke on fixture graphs         │ —                        │
   │ Sssp.DStruct    │ Spec for Pull is oracle   │ Sssp.Algo.DStruct (TBD)  │
   │ Sssp.FindPivots │ Spec only (oracle)        │ Sssp.Algo.FindPivots (TBD)│
   │ Sssp.BaseCase   │ Spec only (oracle)        │ Sssp.Algo.BaseCase (TBD) │

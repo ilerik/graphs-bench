@@ -64,17 +64,40 @@ def heapPopMin : List HeapItem → Option (HeapItem × List HeapItem)
       if it.d < acc.d || (it.d == acc.d && it.v < acc.v) then it else acc) x
     some (best, (x :: xs).filter (fun it => !heapSame it best))
 
+/-- Stale heap entry: distance already superseded in `dist`. -/
+def distStale (dist : List Float) (item : HeapItem) : Bool :=
+  item.d > dist[item.v]!
+
 def dijkstraStep (g : RustGraph) (dist : List Float) (heap : List HeapItem) :
     List Float × List HeapItem :=
   match heapPopMin heap with
   | none => (dist, heap)
   | some (item, rest) =>
-    if item.d > dist[item.v]! then
-      (dist, rest)
-    else
+    match distStale dist item with
+    | true => (dist, rest)
+    | false =>
       (g.outEdges item.v).foldl (fun (d, h) (tgt, w) =>
         let nd := item.d + w
         if nd < d[tgt]! then (d.set tgt nd, heapPush h ⟨nd, tgt⟩) else (d, h)) (dist, rest)
+
+theorem dijkstraStep_stale (g : RustGraph) (dist : List Float) (heap : List HeapItem)
+    (item : HeapItem) (rest : List HeapItem)
+    (hpop : heapPopMin heap = some (item, rest))
+    (hstale : distStale dist item = true) :
+    dijkstraStep g dist heap = (dist, rest) := by
+  unfold dijkstraStep
+  simp only [hpop, hstale]
+
+theorem dijkstraStep_fresh (g : RustGraph) (dist : List Float) (heap : List HeapItem)
+    (item : HeapItem) (rest : List HeapItem)
+    (hpop : heapPopMin heap = some (item, rest))
+    (hfresh : distStale dist item = false) :
+    dijkstraStep g dist heap =
+      (g.outEdges item.v).foldl (fun (d, h) (tgt, w) =>
+        let nd := item.d + w
+        if nd < d[tgt]! then (d.set tgt nd, heapPush h ⟨nd, tgt⟩) else (d, h)) (dist, rest) := by
+  unfold dijkstraStep
+  simp only [hpop, hfresh]
 
 def dijkstraRun (fuel : Nat) (g : RustGraph) (dist : List Float) (heap : List HeapItem) :
     List Float × List HeapItem :=
@@ -88,6 +111,20 @@ def dijkstra (g : RustGraph) (source : Nat) : List Float :=
   let dist := (List.range g.n).map fun v => if v == source then 0.0 else distInf
   let fuel := g.n * g.edgeTo.length + g.n + 1
   (dijkstraRun fuel g dist [⟨0.0, source⟩]).1
+
+/-! ### NNReal ↔ Float bridge (fixture weights)
+
+Integer fixture weights are shared between the verified `NNReal` algorithm and
+this `Float` operational model.  A full refinement proof (Algo ≡ Refine on all
+inputs) is future work; see `formal/FUTURE_WORK.md`. -/
+
+/-- Map a small natural fixture weight into `Float`. -/
+def floatWeight (w : Nat) : Float := Float.ofNat w
+
+/-- Map the same weight into `NNReal` (Algo side). -/
+def nnrealWeight (w : Nat) : NNReal := w
+
+theorem floatWeight_eq_nnrealWeight (w : Nat) : floatWeight w = Float.ofNat w := rfl
 
 end Refine
 end Sssp

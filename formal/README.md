@@ -35,6 +35,7 @@ algorithmic content is not yet verified**.  The current architecture is a
 | `Sssp.Main`        | **Spec only.** Vacuous "successful execution"     | none                      |
 | `Sssp.Algo.Dijkstra` | **Verified (Phase 3).** `dijkstra_correct`       | `n`-round relaxation      |
 | `Sssp.Refine.Dijkstra` | Operational Float/CSR/lazy-heap model           | mirrors `src/dijkstra.rs` |
+| `Sssp.Fixtures.Dijkstra` | `#eval` smoke on shared fixture graphs          | —                        |
 | `Sssp.Algo.DStruct`  | TBD (Phase 4).                                  | block-list with amortised costs |
 | `Sssp.Algo.FindPivots` | TBD (Phase 5).                                | k-round Bellman-Ford      |
 | `Sssp.Algo.BaseCase`   | TBD (Phase 6).                                | bounded mini-Dijkstra     |
@@ -144,6 +145,9 @@ Shared JSON vectors live under `formal/fixtures/dijkstra/` (`tiny_chain.json`,
 Rust validates them via `cargo test shared_json_fixtures` in `src/dijkstra.rs`
 (1e-9 tolerance).  The verified Lean algorithm is `Sssp.Algo.dijkstra`; the
 lazy heap operational model is `Sssp.Refine.dijkstra` on `RustGraph`.
+Lean `#eval` smoke checks live in `Sssp.Fixtures.Dijkstra` (Refine side only;
+`Algo.dijkstra` is noncomputable).  Post–Phase 3 tasks are listed in
+`formal/FUTURE_WORK.md`.
 
 ## Re-fetching the paper
 
