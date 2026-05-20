@@ -32,6 +32,9 @@ arXiv article and its TeX source are vendored under
 * `src/bmssp.rs` — `FindPivots`, `BaseCase`, `BMSSP`, and the top-level
   `sssp_bmssp` entry point.
 * `src/main.rs` — Dijkstra vs. BMSSP timing comparison.
+* `.cursor/skills/lean4/` — Cursor agent skill for Lean 4 / mathlib work (migrated
+  from the OpenCode `lean4-skills` plugin). OpenCode reads the same path via
+  `.opencode/opencode.json`.
 
 ## Running
 

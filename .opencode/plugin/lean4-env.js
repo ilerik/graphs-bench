@@ -10,9 +10,10 @@ import { homedir } from "os"
 
 export default async ({ project, worktree, directory }) => {
   const projectDir = worktree ?? project?.worktree ?? project?.directory ?? directory ?? process.cwd()
-  const skillRoot = join(projectDir, ".opencode", "lean4-skills", "plugins", "lean4")
-  const scripts = join(skillRoot, "lib", "scripts")
-  const refs = join(skillRoot, "skills", "lean4", "references")
+  // Lean skill: repo `.cursor/skills/lean4` (canonical); symlink at ~/.cursor/skills/lean4 ok.
+  const skillRoot = join(projectDir, ".cursor", "skills", "lean4")
+  const scripts = join(skillRoot, "scripts")
+  const refs = join(skillRoot, "references")
   const leanProject = join(projectDir, "formal", "lean")
   const elanBin = join(homedir(), ".elan", "bin")
 
@@ -40,7 +41,7 @@ export default async ({ project, worktree, directory }) => {
       }
     },
     "shell.env": async (_input, output) => {
-      output.env.LEAN4_PLUGIN_ROOT = skillRoot
+      output.env.LEAN4_PLUGIN_ROOT = skillRoot // scripts + references root
       output.env.LEAN4_SCRIPTS = scripts
       output.env.LEAN4_REFS = refs
       if (!output.env.LEAN4_PYTHON_BIN) {

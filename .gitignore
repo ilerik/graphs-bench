@@ -7,5 +7,5 @@ formal/lean/lean_packages/
 formal/lean/build/
 *.olean
 
-# Vendored lean4-skills clone (re-cloneable from upstream; see .opencode/opencode.json)
+# Legacy vendored lean4-skills (canonical copy is ~/.cursor/skills/lean4)
 .opencode/lean4-skills/
