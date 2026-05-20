@@ -8,7 +8,10 @@
       "type": "local",
       "command": ["uvx", "lean-lsp-mcp"],
       "enabled": true,
-      "env": {}
+      "env": {
+        "PATH": "/home/user/.local/bin:/home/user/.elan/bin:/usr/local/bin:/usr/bin:/bin",
+        "LEAN_PROJECT_PATH": "/home/user/nuconstruct/graphs-bench/formal/lean"
+      }
     }
   }
 }
