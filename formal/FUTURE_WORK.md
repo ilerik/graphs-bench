@@ -8,15 +8,16 @@ JSON fixtures).  See `formal/README.md` for the full multi-phase roadmap.
 
 ### 1. Lean executable cross-check on fixtures
 
-**Status:** partial — `Sssp.Fixtures.Dijkstra` runs `#eval` on
-`Sssp.Refine.dijkstra`; Rust runs `cargo test shared_json_fixtures`.
+**Status:** done — `Sssp.Fixtures.Dijkstra` uses `distsMatch` + `#guard` /
+`native_decide` on `Sssp.Refine.dijkstra`.  Rust runs
+`cargo test shared_json_fixtures`.  CI: `.github/workflows/ci.yml` and
+`formal/scripts/check-fixtures.sh`.
 
 **Remaining:**
 
-- Add a CI step that builds `Sssp.Fixtures.Dijkstra` and greps `#eval` output
-  against expected distance vectors (or use `#guard_msgs`).
 - Optionally parse JSON in Lean (via `Lean.Json` or code-gen) so fixture files
-  are the single source of truth instead of duplicated edge lists.
+  are the single source of truth instead of duplicated edge lists in
+  `Sssp.Fixtures.Graph`.
 - The verified `Sssp.Algo.dijkstra` is **noncomputable** (`DistEstimate` over
   `WithTop NNReal`); executable checks stay on Refine/Rust unless we add a
   separate computable extraction path.
@@ -33,16 +34,15 @@ stale duplicates after settlement).
 
 ### 3. NNReal ↔ Float bridge
 
-**Status:** minimal — `floatWeight` / `nnrealWeight` for integer fixture
-weights in `Sssp.Refine.Dijkstra`.
+**Status:** partial — `floatWeight` / `nnrealWeight` in `Sssp.Refine.Dijkstra`;
+shared edge lists in `Sssp.Fixtures.Graph` build both `Graph n` and `RustGraph`.
 
 **Remaining:**
 
-- Map `RustGraph` → `Graph n` (CSR list → `Fin n` multisets) with a lemma that
-  out-degrees are preserved.
+- Prove CSR ↔ multiset correspondence (`rust_outEdge_mem_graph` style lemmas).
 - Prove `Refine.dijkstra` matches `Algo.dijkstra` on that image for **integer
   weights** (then extend to dyadic / rational via monotonicity).
-- Handle `distInf` vs `⊤` for unreachable vertices explicitly.
+- Handle `distInf` vs `⊤` for unreachable vertices explicitly in the proof.
 
 ### 4. Refine ≡ Algo structural equivalence
 
@@ -83,8 +83,8 @@ complexity theorem.
 
 ## Suggested order of attack
 
-1. **Fixture CI** — cheap win, locks Phase 3 regression.
-2. **Refine ↔ Algo on integer fixtures** — extends Phase 3 refinement story.
+1. ~~**Fixture CI**~~ — done (`.github/workflows/ci.yml`, `#guard` checks).
+2. **Refine ↔ Algo on integer fixtures** — shared edge lists done; prove equivalence.
 3. **Phase 4 DStruct** — unlocks pivot finding (Phase 5).
 4. **Cost monad** — parallel track once DStruct API stabilises.
 5. **BMSSP well-founded recursion** — highest proof risk; reuse Dijkstra +
@@ -106,7 +106,7 @@ complexity theorem.
 
 ```bash
 cd formal/lean && lake build
-cd formal/lean && lake env lean Sssp/Fixtures/Dijkstra.lean   # #eval smoke
+./formal/scripts/check-fixtures.sh   # Lean guards + Rust JSON tests
 cd /path/to/graphs-bench && cargo test shared_json_fixtures
 ```
 

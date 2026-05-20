@@ -1,69 +1,45 @@
 /-
   Sssp.Fixtures.Dijkstra
 
-  `#eval` smoke checks for shared JSON fixture vectors under
+  Regression checks for shared JSON fixture vectors under
   `formal/fixtures/dijkstra/`.  Rust cross-checks the same files via
   `cargo test shared_json_fixtures`.
 
   The verified `Sssp.Algo.dijkstra` is noncomputable (`DistEstimate`), so
-  executable cross-checks use `Sssp.Refine.dijkstra` on `RustGraph`.
+  executable checks use `Sssp.Refine.dijkstra` on `RustGraph`.
 -/
 
+import Mathlib
+import Sssp.Fixtures.Graph
 import Sssp.Algo.Dijkstra
-import Sssp.Refine.Dijkstra
 
 namespace Sssp
 namespace Fixtures
 
 open Sssp Refine
 
-/-- Fixture weights are small integers; use the same numeric value in `NNReal` and `Float`. -/
-def nnreal (w : Nat) : NNReal := w
-def float (w : Nat) : Float := Float.ofNat w
+def tinyChainExpected : List Float := [0.0, 1.0, 3.0, 6.0]
+def diamondExpected : List Float := [0.0, 1.0, 1.0, 2.0]
+def unreachableExpected : List Float := [0.0, 1.0, 3.0, distInf, distInf]
+def singleVertexExpected : List Float := [0.0]
 
-def tinyChainGraph : Graph 4 := {
-  edges := fun u v =>
-    if u = 0 ∧ v = 1 then {nnreal 1}
-    else if u = 1 ∧ v = 2 then {nnreal 2}
-    else if u = 2 ∧ v = 3 then {nnreal 3}
-    else {}
-  outDeg_le := by intro u; fin_cases u <;> native_decide }
+/-- Compare distances; treat matching `inf` sentinels as equal. -/
+def floatEq (a b : Float) : Bool :=
+  a == b || (a.isInf && b.isInf)
 
-def diamondGraph : Graph 4 := {
-  edges := fun u v =>
-    if u = 0 ∧ v = 1 then {nnreal 1}
-    else if u = 0 ∧ v = 2 then {nnreal 1}
-    else if u = 1 ∧ v = 3 then {nnreal 1}
-    else if u = 2 ∧ v = 3 then {nnreal 1}
-    else {}
-  outDeg_le := by intro u; fin_cases u <;> native_decide }
+def distsMatch (got exp : List Float) : Bool :=
+  got.length == exp.length &&
+    (got.zip exp).all fun p => floatEq p.1 p.2
 
-def unreachableGraph : Graph 5 := {
-  edges := fun u v =>
-    if u = 0 ∧ v = 1 then {nnreal 1}
-    else if u = 1 ∧ v = 2 then {nnreal 2}
-    else if u = 3 ∧ v = 4 then {nnreal 1}
-    else {}
-  outDeg_le := by intro u; fin_cases u <;> native_decide }
+example : distsMatch (dijkstra tinyChainRust 0) tinyChainExpected = true := by native_decide
+example : distsMatch (dijkstra diamondRust 0) diamondExpected = true := by native_decide
+example : distsMatch (dijkstra unreachableRust 0) unreachableExpected = true := by native_decide
+example : distsMatch (dijkstra singleVertexRust 0) singleVertexExpected = true := by native_decide
 
-def singleVertexGraph : Graph 1 := {
-  edges := fun _ _ => {}
-  outDeg_le := by intro u; fin_cases u <;> native_decide }
-
-def tinyChainRust : RustGraph :=
-  RustGraph.fromEdgeList 4
-    [(0, 1, float 1), (1, 2, float 2), (2, 3, float 3)]
-
-def diamondRust : RustGraph :=
-  RustGraph.fromEdgeList 4
-    [(0, 1, float 1), (0, 2, float 1), (1, 3, float 1), (2, 3, float 1)]
-
-def unreachableRust : RustGraph :=
-  RustGraph.fromEdgeList 5
-    [(0, 1, float 1), (1, 2, float 2), (3, 4, float 1)]
-
-def singleVertexRust : RustGraph :=
-  RustGraph.fromEdgeList 1 []
+#guard distsMatch (dijkstra tinyChainRust 0) tinyChainExpected
+#guard distsMatch (dijkstra diamondRust 0) diamondExpected
+#guard distsMatch (dijkstra unreachableRust 0) unreachableExpected
+#guard distsMatch (dijkstra singleVertexRust 0) singleVertexExpected
 
 section evalSmoke
 
