@@ -20,7 +20,7 @@ jobs:
         run: |
           cd formal/lean
           lake exe cache get
-          lake build Sssp.Fixtures.Dijkstra
+          lake build Sssp.Fixtures.Correctness
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

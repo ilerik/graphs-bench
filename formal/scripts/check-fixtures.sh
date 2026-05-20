@@ -8,7 +8,7 @@ LEAN="$ROOT/formal/lean"
 echo "==> Lean: build + fixture guards"
 cd "$LEAN"
 lake exe cache get 2>/dev/null || true
-lake build Sssp.Fixtures.Dijkstra
+lake build Sssp.Fixtures.Correctness
 
 echo "==> Rust: shared JSON fixtures"
 cd "$ROOT"
