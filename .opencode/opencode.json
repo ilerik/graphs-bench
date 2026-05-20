@@ -6,10 +6,13 @@
   "mcp": {
     "lean-lsp": {
       "type": "local",
-      "command": ["uvx", "lean-lsp-mcp"],
+      "command": [
+        "bash",
+        "-c",
+        "export PATH=/home/user/.local/bin:/home/user/.elan/bin:$PATH; exec uvx lean-lsp-mcp"
+      ],
       "enabled": true,
       "env": {
-        "PATH": "/home/user/.local/bin:/home/user/.elan/bin:/usr/local/bin:/usr/bin:/bin",
         "LEAN_PROJECT_PATH": "/home/user/nuconstruct/graphs-bench/formal/lean"
       }
     }
