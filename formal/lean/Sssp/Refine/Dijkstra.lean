@@ -41,11 +41,14 @@ def outEdgeIndices (g : RustGraph) (u : Nat) : List Nat :=
 def outEdges (g : RustGraph) (u : Nat) : List (Nat × Float) :=
   (outEdgeIndices g u).map fun i => (g.edgeTo[i]!, g.edgeW[i]!)
 
+def mkHead (counts : List Nat) : List Nat :=
+  counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0]
+
 /-- Build a CSR graph from `(u, v, w)` triples (sorted by source). -/
 def fromEdgeList (n : Nat) (edges : List (Nat × Nat × Float)) : RustGraph :=
   let counts := (List.range n).map fun u =>
     edges.filter (fun e => e.1 == u) |>.length
-  let head := counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0]
+  let head := mkHead counts
   let sorted := edges.mergeSort (fun a b => decide (a.1 ≤ b.1))
   { n := n
     head := head
@@ -103,6 +106,42 @@ theorem csr_index_lt_head_end (g : RustGraph) (u i : Nat) (hu : u + 1 < g.head.l
   have hlen := outEdges_length_head g u hu
   rw [hlen] at hi
   omega
+
+theorem outEdges_getElem_snd (g : RustGraph) (u i : Nat)
+    (hu : u + 1 < g.head.length) (hi : i < (g.outEdges u).length)
+    (_hidx : g.head[u]! + i < g.edgeW.length) :
+    ((g.outEdges u)[i]'hi).2 = g.edgeW[g.head[u]! + i]! := by
+  have hi' : i < (g.outEdgeIndices u).length := (outEdgeIndices_length g u).symm ▸ hi
+  have hij := outEdgeIndices_getElem g u i hu hi'
+  dsimp [outEdges]
+  simp only [List.getElem_map, hij]
+
+private theorem foldl_head_length (counts : List Nat) :
+    (mkHead counts).length = counts.length + 1 := by
+  have h : ∀ (acc : List Nat) (counts : List Nat),
+      (counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) acc).length = acc.length + counts.length := by
+    intro acc counts
+    induction counts generalizing acc with
+    | nil => simp
+    | cons c cs ih =>
+      simp only [List.foldl_cons]
+      rw [ih (acc ++ [acc.getLast! + c])]
+      simp only [List.length_append, List.length_cons, List.length_nil]
+      omega
+  rw [mkHead, h [0] counts, List.length_singleton]
+  omega
+
+theorem fromEdgeList_head_length (n : Nat) (edges : List (Nat × Nat × Float)) :
+    (fromEdgeList n edges).head.length = n + 1 := by
+  dsimp only [fromEdgeList]
+  rw [foldl_head_length]
+  simp [List.length_map, List.length_range]
+
+@[simp] theorem fromEdgeList_edgeW_length (n : Nat) (edges : List (Nat × Nat × Float)) :
+    (fromEdgeList n edges).edgeW.length = edges.length := by
+  simp [fromEdgeList, List.length_map, List.length_mergeSort]
+
+-- TODO: prefix-sum monotonicity + filter-length bound → `fromEdgeList_csr_index_lt`.
 
 end RustGraph
 
