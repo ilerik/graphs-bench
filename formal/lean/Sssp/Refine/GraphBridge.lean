@@ -55,6 +55,11 @@ noncomputable def hasNatWeights_fromEdgeList (n : Nat) (es : List (Nat × Nat ×
 def outDegNatLe (g : RustGraph) (n : Nat) : Prop :=
   ∀ u : Fin n, (g.outEdges u.val).length ≤ 2
 
+/-- No out-edge returns to its source (matches benchmark edge lists). -/
+def noSelfLoops (g : RustGraph) (n : Nat) : Prop :=
+  ∀ (u : Fin n) (i : Nat) (hi : i < (g.outEdges u.val).length),
+    ((g.outEdges u.val)[i]'hi).1 ≠ u.val
+
 /-- Every out-edge target is a valid vertex index. -/
 def targetsIn (g : RustGraph) (n : Nat) : Prop :=
   ∀ (u : Fin n) (p : Nat × Float), p ∈ g.outEdges u.val → p.1 < n
@@ -298,6 +303,7 @@ structure ValidRustGraph (n : Nat) (g : RustGraph) where
   hwt : HasNatWeights g
   htgt : targetsIn g n
   hdeg : outDegNatLe g n
+  hns : noSelfLoops g n
 
 namespace ValidRustGraph
 
@@ -305,6 +311,18 @@ variable {n : Nat} {g : RustGraph}
 
 noncomputable def toGraph (vg : ValidRustGraph n g) : Graph n :=
   RustGraph.csrToGraph g n vg.hn vg.hwt vg.htgt vg.hdeg
+
+/-- Verified out-edge count matches CSR out-degree. -/
+theorem outEdges_card (vg : ValidRustGraph n g) (u : Fin n) :
+    (vg.toGraph.outEdges u).card = (g.outEdges u.val).length := by
+  dsimp [toGraph, RustGraph.csrToGraph, Graph.outEdges]
+  rw [Multiset.card_bind]
+  trans ∑ v : Fin n, (RustGraph.weightsToTarget g vg.hwt u.val v.val).length
+  · refine Finset.sum_congr rfl fun v _ => ?_
+    change ((Multiset.ofList (RustGraph.weightsToTarget g vg.hwt u.val v.val)).map (Prod.mk v)).card =
+        (RustGraph.weightsToTarget g vg.hwt u.val v.val).length
+    rw [Multiset.card_map, Multiset.coe_card]
+  exact RustGraph.sum_weightsToTarget_length g n vg.hwt vg.htgt vg.hdeg u
 
 end ValidRustGraph
 

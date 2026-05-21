@@ -87,24 +87,28 @@ noncomputable def tinyChainValid : ValidRustGraph 4 tinyChainRust where
   hwt := hasNatWeights_rustGraphFromNatEdges 4 tinyChainEdges
   htgt := by intro u p hp; fin_cases u <;> native_decide +revert
   hdeg := by intro u; fin_cases u <;> native_decide
+  hns := by intro u i hi; fin_cases u <;> native_decide +revert
 
 noncomputable def diamondValid : ValidRustGraph 4 diamondRust where
   hn := rfl
   hwt := hasNatWeights_rustGraphFromNatEdges 4 diamondEdges
   htgt := by intro u p hp; fin_cases u <;> native_decide +revert
   hdeg := by intro u; fin_cases u <;> native_decide
+  hns := by intro u i hi; fin_cases u <;> native_decide +revert
 
 noncomputable def unreachableValid : ValidRustGraph 5 unreachableRust where
   hn := rfl
   hwt := hasNatWeights_rustGraphFromNatEdges 5 unreachableEdges
   htgt := by intro u p hp; fin_cases u <;> native_decide +revert
   hdeg := by intro u; fin_cases u <;> native_decide
+  hns := by intro u i hi; fin_cases u <;> native_decide +revert
 
 noncomputable def singleVertexValid : ValidRustGraph 1 singleVertexRust where
   hn := rfl
   hwt := hasNatWeights_rustGraphFromNatEdges 1 []
   htgt := by intro u p hp; fin_cases u <;> native_decide +revert
   hdeg := by intro u; fin_cases u <;> native_decide
+  hns := by intro u i hi; fin_cases u <;> native_decide +revert
 
 end Fixtures
 end Sssp

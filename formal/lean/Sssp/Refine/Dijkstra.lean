@@ -44,6 +44,38 @@ def fromEdgeList (n : Nat) (edges : List (Nat × Nat × Float)) : RustGraph :=
     edgeTo := sorted.map Prod.snd |>.map Prod.fst
     edgeW := sorted.map Prod.snd |>.map Prod.snd }
 
+/-! ### CSR list lemmas (for `GraphBridge` nat-weight extraction) -/
+
+@[simp] theorem fromEdgeList_edgeW (n : Nat) (edges : List (Nat × Nat × Float)) :
+    (fromEdgeList n edges).edgeW =
+      ((edges.mergeSort (fun a b => decide (a.1 ≤ b.1))).map Prod.snd).map Prod.snd := by
+  simp [fromEdgeList]
+
+-- TODO: finish CSR index bound lemmas and derive `outEdge_floatWeight_preimage`.
+
+theorem outEdgeIndices_length (g : RustGraph) (u : Nat) :
+    (g.outEdgeIndices u).length = (g.outEdges u).length := by
+  dsimp [outEdges, outEdgeIndices]
+  split_ifs with h
+  · simp [List.length_map]
+  · simp
+
+theorem outEdges_nonempty_head {g : RustGraph} {u i : Nat}
+    (hi : i < (g.outEdges u).length) : u + 1 < g.head.length := by
+  by_contra h
+  have hempty : g.outEdges u = [] := by
+    dsimp [outEdges, outEdgeIndices]
+    simp [h]
+  rw [hempty] at hi
+  exact Nat.not_lt_zero _ hi
+
+theorem outEdgeIndices_getElem (g : RustGraph) (u i : Nat)
+    (hu : u + 1 < g.head.length) (hi : i < (g.outEdgeIndices u).length) :
+    (g.outEdgeIndices u)[i] = g.head[u]! + i := by
+  unfold outEdgeIndices
+  simp only [hu, ↓reduceDIte]
+  rw [List.getElem_map, List.getElem_range]
+
 end RustGraph
 
 structure HeapItem where
