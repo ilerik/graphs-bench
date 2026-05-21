@@ -41,9 +41,26 @@ def edgeOutWeight (n : Nat) (es : List (Nat × Nat × Nat)) (u i : Nat)
   (edges[i]'hi).2
 
 /-- Every CSR slot built from a nat edge list stores a `floatWeight` image. -/
-axiom outEdge_floatWeight_preimage (n : Nat) (es : List (Nat × Nat × Nat)) (u i : Nat)
+theorem outEdge_floatWeight_preimage (n : Nat) (es : List (Nat × Nat × Nat)) (u i : Nat)
     (hi : i < ((edgeListGraph n es).outEdges u).length) :
-    ∃ w : Nat, floatWeight w = edgeOutWeight n es u i hi
+    ∃ w : Nat, floatWeight w = edgeOutWeight n es u i hi := by
+  let g := edgeListGraph n es
+  have hu := RustGraph.outEdges_nonempty_head (g := g) (u := u) (i := i) hi
+  let idx := g.head[u]! + i
+  have hidx := RustGraph.fromEdgeList_csr_index_lt n (natEdgeMap es) u i hu hi
+  have hidx' : idx < g.edgeW.length := by
+    dsimp [idx, g, edgeListGraph, natEdgeMap] at hidx ⊢
+    exact hidx
+  obtain ⟨w, hw⟩ := fromEdgeList_edgeW_floatWeight n es idx (by
+    dsimp [idx, edgeListGraph, g, natEdgeMap]
+    exact hidx)
+  have heq : edgeOutWeight n es u i hi = g.edgeW[idx]! := by
+    dsimp [edgeOutWeight, idx]
+    rw [RustGraph.outEdges_getElem_snd (g := g) u i hu hi hidx', getElem!_pos g.edgeW idx hidx']
+  have hcast : (RustGraph.fromEdgeList n (natEdgeMap es)).edgeW[idx] = g.edgeW[idx]! := by
+    dsimp [edgeListGraph, g, natEdgeMap, idx]
+    exact (getElem!_pos g.edgeW idx hidx').symm
+  exact ⟨w, hw.trans (hcast.trans heq.symm)⟩
 
 /-- Construct `HasNatWeights` for graphs built from `(u, v, w)` nat triples. -/
 noncomputable def hasNatWeights_fromEdgeList (n : Nat) (es : List (Nat × Nat × Nat)) :

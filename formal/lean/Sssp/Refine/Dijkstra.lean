@@ -6,6 +6,7 @@
 -/
 
 import Sssp.Algo.Dijkstra
+import Mathlib
 
 namespace Sssp
 namespace Refine
@@ -42,7 +43,7 @@ def outEdges (g : RustGraph) (u : Nat) : List (Nat × Float) :=
   (outEdgeIndices g u).map fun i => (g.edgeTo[i]!, g.edgeW[i]!)
 
 def mkHead (counts : List Nat) : List Nat :=
-  counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0]
+  counts.scanl (fun acc c => acc + c) 0
 
 /-- Build a CSR graph from `(u, v, w)` triples (sorted by source). -/
 def fromEdgeList (n : Nat) (edges : List (Nat × Nat × Float)) : RustGraph :=
@@ -62,7 +63,88 @@ def fromEdgeList (n : Nat) (edges : List (Nat × Nat × Float)) : RustGraph :=
       ((edges.mergeSort (fun a b => decide (a.1 ≤ b.1))).map Prod.snd).map Prod.snd := by
   simp [fromEdgeList]
 
--- TODO: finish CSR index bound lemmas and derive `outEdge_floatWeight_preimage`.
+-- CSR index bound lemmas for `outEdge_floatWeight_preimage`.
+
+/-! ### Prefix-sum helpers for `fromEdgeList` head bounds -/
+
+private lemma countP_beq_range_le_one (n s : Nat) :
+    (List.range n).countP (fun u => s == u) ≤ 1 := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    rw [List.range_succ, List.countP_append, List.countP_cons, List.countP_nil]
+    split_ifs with h
+    · have h0 : (List.range n).countP (fun u => s == u) = 0 := by
+        rw [List.countP_eq_zero]
+        intro u hu htrue
+        have heq : s = u := beq_iff_eq.mp htrue
+        have hu' : u < n := List.mem_range.mp hu
+        have hs : s = n := beq_iff_eq.mp h
+        exact Nat.lt_irrefl n ((hs.symm.trans heq) ▸ hu')
+      simp [h0, h]
+    · simp [h]
+      exact ih
+
+private lemma sum_indicator_eq_countP (n s : Nat) :
+    ((List.range n).map (fun u => if s == u then 1 else 0)).sum =
+      (List.range n).countP (fun u => s == u) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    rw [List.range_succ, List.map_append, List.sum_append, List.map_singleton, List.sum_singleton,
+      List.countP_append, List.countP_cons, List.countP_nil, ih]
+    by_cases h : s == n <;> simp [h]
+
+private lemma increment_sum_le_one (n s : Nat) :
+    ((List.range n).map (fun u => if s == u then 1 else 0)).sum ≤ 1 := by
+  rw [sum_indicator_eq_countP]
+  exact countP_beq_range_le_one n s
+
+private lemma filter_cons_length {α} (x : α) (xs : List α) (p : α → Bool) :
+    (List.filter p (x :: xs)).length =
+      (List.filter p xs).length + (if p x then 1 else 0) := by
+  simp only [List.filter_cons, List.length_cons, List.length_nil]
+  split_ifs <;> simp
+
+private lemma source_count_sum_le (n : Nat) (edges : List (Nat × Nat × Nat)) :
+    ((List.range n).map (fun u => (edges.filter (fun e => e.1 == u)).length)).sum ≤ edges.length := by
+  induction edges with
+  | nil => simp
+  | cons e es ih =>
+    have hdecomp (u : Nat) :
+        (List.filter (fun x => x.1 == u) (e :: es)).length =
+          (List.filter (fun x => x.1 == u) es).length + (if e.1 == u then 1 else 0) :=
+      filter_cons_length e es (fun x => x.1 == u)
+    have hext :
+        (List.range n).map (fun u => (List.filter (fun x => x.1 == u) (e :: es)).length) =
+          (List.range n).map (fun u =>
+            (List.filter (fun x => x.1 == u) es).length + (if e.1 == u then 1 else 0)) := by
+      apply List.map_congr_left
+      intro u _
+      rw [hdecomp u]
+    rw [hext, List.sum_map_add, List.length_cons]
+    have hinc := increment_sum_le_one n e.1
+    omega
+
+private lemma source_count_sum_le_float (n : Nat) (edges : List (Nat × Nat × Float)) :
+    ((List.range n).map (fun u => (edges.filter (fun e => e.1 == u)).length)).sum ≤ edges.length := by
+  induction edges with
+  | nil => simp
+  | cons e es ih =>
+    have hdecomp (u : Nat) :
+        (List.filter (fun x => x.1 == u) (e :: es)).length =
+          (List.filter (fun x => x.1 == u) es).length + (if e.1 == u then 1 else 0) :=
+      filter_cons_length e es (fun x => x.1 == u)
+    have hext :
+        (List.range n).map (fun u => (List.filter (fun x => x.1 == u) (e :: es)).length) =
+          (List.range n).map (fun u =>
+            (List.filter (fun x => x.1 == u) es).length + (if e.1 == u then 1 else 0)) := by
+      apply List.map_congr_left
+      intro u _
+      rw [hdecomp u]
+    rw [hext, List.sum_map_add, List.length_cons]
+    have hinc := increment_sum_le_one n e.1
+    omega
 
 theorem outEdgeIndices_length (g : RustGraph) (u : Nat) :
     (g.outEdgeIndices u).length = (g.outEdges u).length := by
@@ -118,18 +200,26 @@ theorem outEdges_getElem_snd (g : RustGraph) (u i : Nat)
 
 private theorem foldl_head_length (counts : List Nat) :
     (mkHead counts).length = counts.length + 1 := by
-  have h : ∀ (acc : List Nat) (counts : List Nat),
-      (counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) acc).length = acc.length + counts.length := by
-    intro acc counts
-    induction counts generalizing acc with
-    | nil => simp
-    | cons c cs ih =>
-      simp only [List.foldl_cons]
-      rw [ih (acc ++ [acc.getLast! + c])]
-      simp only [List.length_append, List.length_cons, List.length_nil]
-      omega
-  rw [mkHead, h [0] counts, List.length_singleton]
-  omega
+  dsimp [mkHead]
+  rw [List.length_scanl]
+
+private theorem mkHead_getElem (counts : List Nat) (k : Nat) (hk : k ≤ counts.length) :
+    (mkHead counts)[k]'(by rw [foldl_head_length counts]; omega) = (counts.take k).sum := by
+  dsimp [mkHead]
+  rw [List.getElem_scanl, List.sum_eq_foldl]
+
+private lemma sum_take_le {l : List Nat} {i j : Nat} (hij : i ≤ j) (_hj : j ≤ l.length) :
+    (l.take i).sum ≤ (l.take j).sum := by
+  have h : (l.take i).sum ≤ (l.take (i + (j - i))).sum := by
+    suffices ∀ k, (l.take i).sum ≤ (l.take (i + k)).sum by exact this (j - i)
+    intro k
+    induction k with
+    | zero => rfl
+    | succ k ih =>
+      rw [show i + (k + 1) = (i + k) + 1 from by ring, List.take_add_one]
+      simp only [List.sum_append]
+      exact Nat.le_trans ih (Nat.le_add_right _ _)
+  rwa [Nat.add_sub_cancel' hij] at h
 
 theorem fromEdgeList_head_length (n : Nat) (edges : List (Nat × Nat × Float)) :
     (fromEdgeList n edges).head.length = n + 1 := by
@@ -141,12 +231,39 @@ theorem fromEdgeList_head_length (n : Nat) (edges : List (Nat × Nat × Float)) 
     (fromEdgeList n edges).edgeW.length = edges.length := by
   simp [fromEdgeList, List.length_map, List.length_mergeSort]
 
--- TODO: prefix-sum monotonicity + filter-length bound → `fromEdgeList_csr_index_lt`.
+theorem fromEdgeList_csr_index_lt (n : Nat) (edges : List (Nat × Nat × Float)) (u i : Nat)
+    (hu : u + 1 < (fromEdgeList n edges).head.length)
+    (hi : i < ((fromEdgeList n edges).outEdges u).length) :
+    (fromEdgeList n edges).head[u]! + i < (fromEdgeList n edges).edgeW.length := by
+  let g := fromEdgeList n edges
+  let counts := (List.range n).map fun u => (edges.filter (fun e => e.1 == u)).length
+  have hidx := csr_index_lt_head_end g u i hu hi
+  have hlen := fromEdgeList_head_length n edges
+  have hg : g.head = mkHead counts := rfl
+  have hk : u + 1 ≤ counts.length := by
+    rw [hlen] at hu
+    simp only [counts, List.length_map, List.length_range] at hu ⊢
+    exact Nat.le_of_lt_succ hu
+  have hcounts_len : counts.length = n := by simp [counts]
+  have hle : (counts.take (u + 1)).sum ≤ counts.sum := by
+    have h := sum_take_le (l := counts) (i := u + 1) (j := counts.length) hk (Nat.le_refl _)
+    simpa [List.take_length] using h
+  have hbound : g.head[u + 1]! ≤ edges.length := by
+    have hu' : u + 1 < (mkHead counts).length := by
+      rw [foldl_head_length, hcounts_len, ← hlen]
+      exact hu
+    rw [hg, getElem!_pos (mkHead counts) (u + 1) hu', mkHead_getElem counts (u + 1) hk]
+    exact Nat.le_trans hle (source_count_sum_le_float n edges)
+  rw [fromEdgeList_edgeW_length]
+  exact Nat.lt_of_lt_of_le hidx hbound
 
 end RustGraph
 
 def natEdgeMap (es : List (Nat × Nat × Nat)) : List (Nat × Nat × Float) :=
   es.map fun e => (e.1, e.2.1, floatWeight e.2.2)
+
+@[simp] lemma natEdgeMap_length (es : List (Nat × Nat × Nat)) :
+    (natEdgeMap es).length = es.length := by simp [natEdgeMap]
 
 private lemma mem_natEdgeMap {es : List (Nat × Nat × Nat)} {p : Nat × Nat × Float}
     (hp : p ∈ natEdgeMap es) :
