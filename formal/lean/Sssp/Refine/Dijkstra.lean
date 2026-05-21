@@ -107,24 +107,52 @@ def dijkstraRun (fuel : Nat) (g : RustGraph) (dist : List Float) (heap : List He
     let (d, h) := dijkstraStep g dist heap
     dijkstraRun fuel g d h
 
-def dijkstra (g : RustGraph) (source : Nat) : List Float :=
+/-- Lazy min-heap Dijkstra (mirrors `src/dijkstra.rs`). -/
+def dijkstraHeap (g : RustGraph) (source : Nat) : List Float :=
   let dist := (List.range g.n).map fun v => if v == source then 0.0 else distInf
   let fuel := g.n * g.edgeTo.length + g.n + 1
   (dijkstraRun fuel g dist [⟨0.0, source⟩]).1
 
-/-! ### NNReal ↔ Float bridge (fixture weights)
+def initDist (g : RustGraph) (source : Nat) : List Float :=
+  (List.range g.n).map fun v => if v == source then 0.0 else distInf
 
-Integer fixture weights are shared between the verified `NNReal` algorithm and
-this `Float` operational model.  A full refinement proof (Algo ≡ Refine on all
-inputs) is future work; see `formal/FUTURE_WORK.md`. -/
+def floatRelaxEdge (dist : List Float) (u tgt : Nat) (w : Float) : List Float :=
+  let nd := dist[u]! + w
+  if nd < dist[tgt]! then dist.set tgt nd else dist
 
-/-- Map a small natural fixture weight into `Float`. -/
-def floatWeight (w : Nat) : Float := Float.ofNat w
+def floatRelaxOut (g : RustGraph) (dist : List Float) (u : Nat) : List Float :=
+  (g.outEdges u).foldl (fun d p => floatRelaxEdge d u p.1 p.2) dist
+
+def floatRelaxAll (g : RustGraph) (dist : List Float) : List Float :=
+  (List.range g.n).foldl (fun d u => floatRelaxOut g d u) dist
+
+def floatRelaxRound : Nat → RustGraph → List Float → List Float
+| 0, _, d => d
+| fuel + 1, g, d => floatRelaxRound fuel g (floatRelaxAll g d)
+
+/-- Proof-relevant `n`-round float relaxation (matches verified `Algo.dijkstra`). -/
+def dijkstraRelax (g : RustGraph) (source : Nat) : List Float :=
+  floatRelaxRound g.n g (initDist g source)
+
+/-- Executable shortest-path distances (lazy heap; mirrors `src/dijkstra.rs`). -/
+def dijkstra (g : RustGraph) (source : Nat) : List Float :=
+  dijkstraHeap g source
+
+/-! ### NNReal ↔ Float bridge (integer weights)
+
+Natural-number weights are accumulated by successor (`+ 1.0`) so Phase 3b can
+relate `Float` relaxations to verified `WithTop NNReal` / `WithTop Nat` sums. -/
+
+/-- Map a natural weight into `Float` (Peano-style; agrees with `Float.ofNat` on fixtures). -/
+def floatWeight : Nat → Float
+| 0 => 0.0
+| w + 1 => floatWeight w + 1.0
 
 /-- Map the same weight into `NNReal` (Algo side). -/
 def nnrealWeight (w : Nat) : NNReal := w
 
-theorem floatWeight_eq_nnrealWeight (w : Nat) : floatWeight w = Float.ofNat w := rfl
+theorem floatWeight_zero : floatWeight 0 = 0.0 := rfl
+theorem floatWeight_succ (w : Nat) : floatWeight (w + 1) = floatWeight w + 1.0 := rfl
 
 end Refine
 end Sssp

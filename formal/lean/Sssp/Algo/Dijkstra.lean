@@ -235,7 +235,7 @@ private theorem relaxRound_le_initWalk {G : Graph n} {s u : Fin n} (fuel : ℕ) 
   have h := relaxRound_le_add_walk fuel (initEstimate s) w hk
   simpa [initEstimate_self, zero_add] using h
 
-private theorem relaxAll_sound {G : Graph n} {s : Fin n} (dHat : DistEstimate n)
+theorem relaxAll_sound {G : Graph n} {s : Fin n} (dHat : DistEstimate n)
     (h : Sound G s dHat) : Sound G s (relaxAll G dHat) := by
   unfold relaxAll
   revert dHat h
@@ -302,12 +302,12 @@ private theorem relaxRound_init_self {G : Graph n} {s : Fin n} (fuel : ℕ) :
     relaxRound G fuel (initEstimate s) s = 0 :=
   relaxRound_preserves_zero_at_source fuel (initEstimate_self (s := s))
 
-private theorem dijkstra_ge_trueDist {G : Graph n} {s v : Fin n} :
+theorem dijkstra_ge_trueDist {G : Graph n} {s v : Fin n} :
     trueDist G s v ≤ dijkstra G s v := by
   unfold dijkstra
   exact relaxRound_sound n (initEstimate s) (initEstimate_sound G s) v
 
-private theorem dijkstra_le_trueDist {G : Graph n} {s v : Fin n} :
+theorem dijkstra_le_trueDist {G : Graph n} {s v : Fin n} :
     dijkstra G s v ≤ trueDist G s v := by
   unfold dijkstra
   by_cases h : trueDist G s v = ⊤

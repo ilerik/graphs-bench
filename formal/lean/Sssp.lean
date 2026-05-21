@@ -23,9 +23,14 @@
   │ Sssp.Algo.Dijkstra │ Verified (`dijkstra_correct`)           │ —                     │
   │ Sssp.Refine.Dijkstra │ Float/CSR heap + step lemmas          │ —                        │
   │ Sssp.Refine.Bridge │ Fixture regression (not proof target)   │ —                        │
-  │ Sssp.Refine.GraphBridge │ Phase 3b CSR→Graph bridge (WIP)      │ —                        │
-  │ Sssp.Fixtures.*  │ CI regression (Phase 3b gate pending)     │ —                        │
-  │ **Phase 3b**     │ Refine ≡ Algo, all inputs — **next**      │ blocks Phase 4+          │
+  │ Sssp.Refine.GraphBridge │ Phase 3b CSR→Graph bridge (done)           │ —                        │
+  │ Sssp.Refine.NumericBridge │ Float/`NNReal` embedding (Phase 3b)      │ —                        │
+  │ Sssp.Refine.Simulation  │ `floatRelaxRound` + invariants (3b)      │ —                        │
+  │ Sssp.Refine.HeapBridge  │ heap ≡ relax (trusted + fixture checks)    │ —                        │
+  │ Sssp.Refine.RefineCorrectness │ Main refinement theorem (3b)         │ —                        │
+  │ Sssp.Refine.Verification      │ End-to-end API (`dijkstra_verified`) │ —                        │
+  │ Sssp.Fixtures.*  │ CI regression + fixture refinement checks       │ —                        │
+  │ **Phase 3b**     │ Refine ≡ Algo (`refine_dijkstra_correct`) ✓      │ CSR/heap gaps in FUTURE  │
   │ Sssp.DStruct    │ Spec for Pull is oracle   │ Sssp.Algo.DStruct (TBD)  │
   │ Sssp.FindPivots │ Spec only (oracle)        │ Sssp.Algo.FindPivots (TBD)│
   │ Sssp.BaseCase   │ Spec only (oracle)        │ Sssp.Algo.BaseCase (TBD) │
@@ -66,3 +71,8 @@ import Sssp.Main
 import Sssp.Algo.Dijkstra
 import Sssp.Refine.Dijkstra
 import Sssp.Refine.GraphBridge
+import Sssp.Refine.NumericBridge
+import Sssp.Refine.Simulation
+import Sssp.Refine.HeapBridge
+import Sssp.Refine.RefineCorrectness
+import Sssp.Refine.Verification
