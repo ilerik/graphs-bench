@@ -1,0 +1,674 @@
+% =====================================================================
+%  refs.bib  --  Bibliography for
+%  "A Verified Floating-Point Dijkstra in Lean 4 + Rust"
+%
+%  Convention:
+%    * keep entries in the order they first appear in the paper;
+%    * arXiv ids and DOIs are preserved verbatim;
+%    * \todo{verify: ...} flags entries the authors should double-check
+%      before submission.
+% =====================================================================
+
+% ---------------------------------------------------------------------
+%  Duan et al. -- the algorithmic motivation
+% ---------------------------------------------------------------------
+@article{DuanMaoMaoShuYin2025,
+  author       = {Ran Duan and Jiayi Mao and Xiao Mao and Xinkai Shu and Longhui Yin},
+  title        = {Breaking the Sorting Barrier for Directed Single-Source Shortest Paths},
+  journal      = {CoRR},
+  volume       = {abs/2504.17033},
+  year         = {2025},
+  url          = {https://arxiv.org/abs/2504.17033},
+  eprint       = {2504.17033},
+  archivePrefix= {arXiv},
+  primaryClass = {cs.DS},
+  note         = {STOC 2025 Best Paper}
+}
+
+@article{Dijkstra1959,
+  author    = {E. W. Dijkstra},
+  title     = {A Note on Two Problems in Connexion with Graphs},
+  journal   = {Numerische Mathematik},
+  volume    = {1},
+  pages     = {269--271},
+  year      = {1959},
+  doi       = {10.1007/BF01386390}
+}
+
+@article{FredmanTarjan1987,
+  author  = {Michael L. Fredman and Robert E. Tarjan},
+  title   = {Fibonacci Heaps and Their Uses in Improved Network Optimization Algorithms},
+  journal = {Journal of the ACM},
+  volume  = {34},
+  number  = {3},
+  pages   = {596--615},
+  year    = {1987},
+  doi     = {10.1145/28869.28874}
+}
+
+% ---------------------------------------------------------------------
+%  Mechanized Dijkstra over abstract weights
+% ---------------------------------------------------------------------
+@article{Chen2003,
+  author  = {Jing-Chao Chen},
+  title   = {{Dijkstra}'s Shortest Path Algorithm},
+  journal = {Journal of Formalized Mathematics},
+  volume  = {15},
+  pages   = {237--247},
+  year    = {2003}
+}
+
+@inproceedings{MooreZhang2005,
+  author    = {J Strother Moore and Qiang Zhang},
+  title     = {Proof Pearl: {Dijkstra}'s Shortest Path Algorithm Verified with {ACL2}},
+  booktitle = {Theorem Proving in Higher Order Logics, 18th International Conference (TPHOLs 2005)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {3603},
+  pages     = {373--384},
+  publisher = {Springer},
+  year      = {2005},
+  doi       = {10.1007/11541868\_24}
+}
+
+@techreport{MangeKuhn2007,
+  author      = {Roman Mange and Jonas Kuhn},
+  title       = {Verifying {Dijkstra}'s Algorithm in {Jahob}},
+  institution = {EPFL},
+  type        = {Student project report},
+  year        = {2007},
+  note        = {\todo{verify: confirm bibliographic details from EPFL archives or from Mohan et al.\ CAV 2021 reference [52]}}
+}
+
+@mastersthesis{Klasen2010,
+  author = {Volker Klasen},
+  title  = {Verifying {Dijkstra}'s Algorithm with {KeY}},
+  school = {TU Darmstadt},
+  type   = {Diploma thesis},
+  year   = {2010}
+}
+
+@inproceedings{LiuNagelTaghdiri2012,
+  author    = {Tianhai Liu and Mattias Nagel and Mana Taghdiri},
+  title     = {Bounded Program Verification using an {SMT} Solver: A Case Study},
+  booktitle = {Fifth IEEE International Conference on Software Testing, Verification and Validation (ICST 2012)},
+  pages     = {101--110},
+  year      = {2012},
+  doi       = {10.1109/ICST.2012.97}
+}
+
+@article{NordhoffLammich2012,
+  author  = {Benedikt Nordhoff and Peter Lammich},
+  title   = {{Dijkstra}'s Shortest Path Algorithm},
+  journal = {Archive of Formal Proofs},
+  month   = jan,
+  year    = {2012},
+  url     = {https://www.isa-afp.org/entries/Dijkstra_Shortest_Path.html},
+  issn    = {2150-914X},
+  note    = {Formal proof development}
+}
+
+@inproceedings{LammichNipkow2019,
+  author    = {Peter Lammich and Tobias Nipkow},
+  title     = {Proof Pearl: Purely Functional, Simple and Efficient Priority Search Trees and
+               Applications to {Prim} and {Dijkstra}},
+  booktitle = {10th International Conference on Interactive Theorem Proving (ITP 2019)},
+  series    = {LIPIcs},
+  volume    = {141},
+  pages     = {17:1--17:18},
+  publisher = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
+  year      = {2019},
+  doi       = {10.4230/LIPIcs.ITP.2019.17}
+}
+
+@article{WimmerLammich2017,
+  author  = {Simon Wimmer and Peter Lammich},
+  title   = {The {Floyd}--{Warshall} Algorithm for Shortest Paths},
+  journal = {Archive of Formal Proofs},
+  month   = may,
+  year    = {2017},
+  url     = {https://www.isa-afp.org/entries/Floyd_Warshall.html},
+  issn    = {2150-914X}
+}
+
+@misc{Filliatre2011Toccata,
+  author       = {Jean-Christophe Filliâtre},
+  title        = {{Dijkstra}'s Shortest Path Algorithm},
+  howpublished = {Toccata gallery, Inria},
+  year         = {2011},
+  url          = {https://toccata.gitlabpages.inria.fr/toccata/gallery/dijkstra.en.html}
+}
+
+@book{Leino2023ProgramProofs,
+  author    = {K. Rustan M. Leino},
+  title     = {Program Proofs},
+  publisher = {The MIT Press},
+  year      = {2023}
+}
+
+% ---------------------------------------------------------------------
+%  CertiGraph / VST / CompCert
+% ---------------------------------------------------------------------
+@inproceedings{MohanLeowHobor2021,
+  author    = {Anshuman Mohan and Wei Xiang Leow and Aquinas Hobor},
+  title     = {Functional Correctness of {C} Implementations of {Dijkstra}'s, {Kruskal}'s, and
+               {Prim}'s Algorithms},
+  booktitle = {Computer Aided Verification, 33rd International Conference (CAV 2021), Part II},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {12760},
+  pages     = {801--826},
+  publisher = {Springer},
+  year      = {2021},
+  doi       = {10.1007/978-3-030-81688-9\_37}
+}
+
+@article{WangCaoMohanHobor2019,
+  author  = {Shengyi Wang and Qinxiang Cao and Anshuman Mohan and Aquinas Hobor},
+  title   = {Certifying Graph-Manipulating {C} Programs via Localizations within Data Structures},
+  journal = {Proceedings of the ACM on Programming Languages},
+  volume  = {3},
+  number  = {OOPSLA},
+  pages   = {171:1--171:30},
+  year    = {2019},
+  doi     = {10.1145/3360597}
+}
+
+@phdthesis{Wang2019Thesis,
+  author = {Shengyi Wang},
+  title  = {Mechanized Verification of Graph-Manipulating Programs},
+  school = {National University of Singapore},
+  year   = {2019}
+}
+
+@article{Leroy2009CompCert,
+  author  = {Xavier Leroy},
+  title   = {Formal Verification of a Realistic Compiler},
+  journal = {Communications of the ACM},
+  volume  = {52},
+  number  = {7},
+  pages   = {107--115},
+  year    = {2009},
+  doi     = {10.1145/1538788.1538814}
+}
+
+@inproceedings{AppelVST2011,
+  author    = {Andrew W. Appel},
+  title     = {{Verified Software Toolchain}},
+  booktitle = {Programming Languages and Systems, 20th European Symposium (ESOP 2011)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {6602},
+  pages     = {1--17},
+  publisher = {Springer},
+  year      = {2011},
+  doi       = {10.1007/978-3-642-19718-5\_1}
+}
+
+@inproceedings{Charguraud2011CFML,
+  author    = {Arthur Charguéraud},
+  title     = {Characteristic Formulae for the Verification of Imperative Programs},
+  booktitle = {Proc. 16th ACM SIGPLAN International Conference on Functional Programming (ICFP 2011)},
+  pages     = {418--430},
+  publisher = {ACM},
+  year      = {2011},
+  doi       = {10.1145/2034773.2034828}
+}
+
+% ---------------------------------------------------------------------
+%  Lean 4 / Mathlib
+% ---------------------------------------------------------------------
+@inproceedings{Mathlib2020,
+  author    = {{The mathlib Community}},
+  title     = {The {Lean} Mathematical Library},
+  booktitle = {Proceedings of the 9th ACM SIGPLAN International Conference on Certified Programs and Proofs (CPP 2020)},
+  pages     = {367--381},
+  publisher = {ACM},
+  year      = {2020},
+  doi       = {10.1145/3372885.3373824}
+}
+
+@inproceedings{deMouraUllrich2021Lean4,
+  author    = {Leonardo de Moura and Sebastian Ullrich},
+  title     = {The {Lean 4} Theorem Prover and Programming Language},
+  booktitle = {Automated Deduction -- CADE 28},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {12699},
+  pages     = {625--635},
+  publisher = {Springer},
+  year      = {2021},
+  doi       = {10.1007/978-3-030-79876-5\_37}
+}
+
+@misc{MathlibSimpleGraph,
+  author       = {{The mathlib Community}},
+  title        = {{Mathlib4} -- {\tt Mathlib.Combinatorics.SimpleGraph}},
+  howpublished = {GitHub repository \texttt{leanprover-community/mathlib4}},
+  year         = {2024},
+  url          = {https://leanprover-community.github.io/mathlib4_docs/Mathlib/Combinatorics/SimpleGraph/Basic.html}
+}
+
+@misc{MathlibQuiver,
+  author       = {{The mathlib Community}},
+  title        = {{Mathlib4} -- {\tt Mathlib.Combinatorics.Quiver.Arborescence}},
+  howpublished = {GitHub repository \texttt{leanprover-community/mathlib4}},
+  year         = {2024},
+  url          = {https://leanprover-community.github.io/mathlib4_docs/Mathlib/Combinatorics/Quiver/Arborescence.html}
+}
+
+@article{DoczkalPous2020Minor,
+  author  = {Christian Doczkal and Damien Pous},
+  title   = {A Formal Proof of the Minor-Exclusion Property for Treewidth-Two Graphs},
+  journal = {Journal of Automated Reasoning},
+  volume  = {64},
+  number  = {7},
+  pages   = {1265--1296},
+  year    = {2020},
+  doi     = {10.1007/s10817-020-09558-9}
+}
+
+@article{Noschinski2015GraphLib,
+  author  = {Lars Noschinski},
+  title   = {A Graph Library for {Isabelle}},
+  journal = {Mathematics in Computer Science},
+  volume  = {9},
+  number  = {1},
+  pages   = {23--39},
+  year    = {2015},
+  doi     = {10.1007/s11786-014-0183-z}
+}
+
+@inproceedings{LammichSefidgar2016EK,
+  author    = {Peter Lammich and S. Reza Sefidgar},
+  title     = {Formalizing the {Edmonds}-{Karp} Algorithm},
+  booktitle = {Interactive Theorem Proving, 7th International Conference (ITP 2016)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {9807},
+  pages     = {219--234},
+  publisher = {Springer},
+  year      = {2016},
+  doi       = {10.1007/978-3-319-43144-4\_15}
+}
+
+% ---------------------------------------------------------------------
+%  Rust verification
+% ---------------------------------------------------------------------
+@article{Lattuada2023Verus,
+  author  = {Andrea Lattuada and Travis Hance and Chanhee Cho and Matthias Brun and
+             Isitha Subasinghe and Yi Zhou and Jon Howell and Bryan Parno and Chris Hawblitzel},
+  title   = {Verus: Verifying {Rust} Programs using Linear Ghost Types},
+  journal = {Proceedings of the ACM on Programming Languages},
+  volume  = {7},
+  number  = {OOPSLA1},
+  pages   = {85:286--85:315},
+  year    = {2023},
+  doi     = {10.1145/3586037},
+  note    = {Extended version: arXiv:2303.05491}
+}
+
+@inproceedings{Lattuada2024Verus,
+  author    = {Andrea Lattuada and Travis Hance and Jay Bosamiya and Matthias Brun and
+               Chanhee Cho and Hayley LeBlanc and Pranav Srinivasan and Reto Achermann and
+               Tej Chajed and Chris Hawblitzel and Jon Howell and Jacob R. Lorch and
+               Oded Padon and Bryan Parno},
+  title    = {Verus: A Practical Foundation for Systems Verification},
+  booktitle= {Proceedings of the 30th Symposium on Operating Systems Principles (SOSP 2024)},
+  pages    = {438--454},
+  publisher= {ACM},
+  year     = {2024},
+  doi      = {10.1145/3694715.3695952}
+}
+
+@inproceedings{DenisJourdanMarche2022Creusot,
+  author    = {Xavier Denis and Jacques-Henri Jourdan and Claude Marché},
+  title     = {{Creusot}: A Foundry for the Deductive Verification of {Rust} Programs},
+  booktitle = {Formal Methods and Software Engineering -- 23rd International Conference on Formal Engineering Methods (ICFEM 2022)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {13478},
+  pages     = {90--105},
+  publisher = {Springer},
+  year      = {2022},
+  doi       = {10.1007/978-3-031-17244-1\_6}
+}
+
+@article{HoProtzenko2022Aeneas,
+  author  = {Son Ho and Jonathan Protzenko},
+  title   = {{Aeneas}: {Rust} Verification by Functional Translation},
+  journal = {Proceedings of the ACM on Programming Languages},
+  volume  = {6},
+  number  = {ICFP},
+  pages   = {116:711--116:741},
+  year    = {2022},
+  doi     = {10.1145/3547647},
+  note    = {arXiv:2206.07185}
+}
+
+@article{HoFromherzProtzenko2024Aeneas,
+  author  = {Son Ho and Aymeric Fromherz and Jonathan Protzenko},
+  title   = {Sound Borrow-Checking for {Rust} via Symbolic Semantics},
+  journal = {Proceedings of the ACM on Programming Languages},
+  volume  = {8},
+  number  = {ICFP},
+  year    = {2024},
+  doi     = {10.1145/3674640},
+  note    = {arXiv:2404.02680}
+}
+
+@inproceedings{Astrauskas2019Prusti,
+  author    = {Vytautas Astrauskas and Peter Müller and Federico Poli and Alexander J. Summers},
+  title     = {Leveraging {Rust} Types for Modular Specification and Verification},
+  booktitle = {Proceedings of the ACM on Programming Languages},
+  volume    = {3},
+  number    = {OOPSLA},
+  pages     = {147:1--147:30},
+  year      = {2019},
+  doi       = {10.1145/3360573}
+}
+
+@inproceedings{Astrauskas2022Prusti,
+  author    = {Vytautas Astrauskas and Aurel Bílý and Jonáš Fiala and Zachary Grannan and
+               Christoph Matheja and Peter Müller and Federico Poli and Alexander J. Summers},
+  title     = {The {Prusti} Project: Formal Verification for {Rust} (Invited)},
+  booktitle = {NASA Formal Methods, 14th International Symposium (NFM 2022)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {13260},
+  pages     = {88--108},
+  publisher = {Springer},
+  year      = {2022},
+  doi       = {10.1007/978-3-031-06773-0\_5}
+}
+
+@inproceedings{VanHattum2022Kani,
+  author    = {Daniel Schwartz-Narbonne and Felipe R. Monteiro and Sirui Lu and Justin Chadwick and
+               Adrian Palacios and Lefan Zhang and Zyad Hassan and Mark R. Tuttle and
+               Michael Tautschnig},
+  title     = {{Kani}: A Bit-Precise Model Checker for Verifying {Rust}},
+  booktitle = {37th IEEE/ACM International Conference on Automated Software Engineering (ASE 2022)},
+  publisher = {ACM},
+  year      = {2022},
+  url       = {https://github.com/model-checking/kani},
+  note      = {\todo{verify: confirm exact author list and DOI in ACM digital library}}
+}
+
+@article{Matsushita2020RustHorn,
+  author  = {Yusuke Matsushita and Takeshi Tsukada and Naoki Kobayashi},
+  title   = {{RustHorn}: {CHC}-Based Verification for {Rust} Programs},
+  journal = {ACM Transactions on Programming Languages and Systems},
+  volume  = {43},
+  number  = {4},
+  pages   = {15:1--15:54},
+  year    = {2021},
+  doi     = {10.1145/3462205},
+  note    = {Conference version: ESOP 2020}
+}
+
+@inproceedings{Matsushita2022RustHornBelt,
+  author    = {Yusuke Matsushita and Xavier Denis and Jacques-Henri Jourdan and Derek Dreyer},
+  title     = {{RustHornBelt}: A Semantic Foundation for Functional Verification of {Rust}
+               Programs with Unsafe Code},
+  booktitle = {Proceedings of the 43rd ACM SIGPLAN International Conference on Programming
+               Language Design and Implementation (PLDI 2022)},
+  pages     = {841--856},
+  publisher = {ACM},
+  year      = {2022},
+  doi       = {10.1145/3519939.3523704}
+}
+
+@misc{HacspecHax2024,
+  author       = {{The hax developers}},
+  title        = {hax: a verification toolchain for {Rust}},
+  howpublished = {Project page \url{https://hacspec.org} and GitHub repository
+                  \texttt{hacspec/hax}},
+  year         = {2024}
+}
+
+@inproceedings{JungRustBelt2018,
+  author    = {Ralf Jung and Jacques-Henri Jourdan and Robbert Krebbers and Derek Dreyer},
+  title     = {{RustBelt}: Securing the Foundations of the {Rust} Programming Language},
+  booktitle = {Proceedings of the ACM on Programming Languages},
+  volume    = {2},
+  number    = {POPL},
+  pages     = {66:1--66:34},
+  year      = {2018},
+  doi       = {10.1145/3158154}
+}
+
+% ---------------------------------------------------------------------
+%  Floating-point in proof assistants
+% ---------------------------------------------------------------------
+@inproceedings{BoldoMelquiond2011Flocq,
+  author    = {Sylvie Boldo and Guillaume Melquiond},
+  title     = {{Flocq}: A Unified Library for Proving Floating-Point Algorithms in {Coq}},
+  booktitle = {20th IEEE Symposium on Computer Arithmetic (ARITH 2011)},
+  pages     = {243--252},
+  publisher = {IEEE},
+  year      = {2011},
+  doi       = {10.1109/ARITH.2011.40}
+}
+
+@book{BoldoMelquiond2017Book,
+  author    = {Sylvie Boldo and Guillaume Melquiond},
+  title     = {Computer Arithmetic and Formal Proofs:
+               Verifying Floating-point Algorithms with the {Coq} System},
+  publisher = {ISTE Press / Elsevier},
+  year      = {2017},
+  isbn      = {978-1-78548-112-3}
+}
+
+@article{BoldoJourdanLeroyMelquiond2014,
+  author  = {Sylvie Boldo and Jacques-Henri Jourdan and Xavier Leroy and Guillaume Melquiond},
+  title   = {Verified Compilation of Floating-Point Computations},
+  journal = {Journal of Automated Reasoning},
+  volume  = {54},
+  number  = {2},
+  pages   = {135--163},
+  year    = {2015},
+  doi     = {10.1007/s10817-014-9317-x},
+  note    = {Conference version at ARITH 2013}
+}
+
+@inproceedings{BoldoFilliatreMelquiond2009Gappa,
+  author    = {Sylvie Boldo and Jean-Christophe Filliâtre and Guillaume Melquiond},
+  title     = {Combining {Coq} and {Gappa} for Certifying Floating-Point Programs},
+  booktitle = {Calculemus 2009 / MKM 2009},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {5625},
+  pages     = {59--74},
+  publisher = {Springer},
+  year      = {2009},
+  doi       = {10.1007/978-3-642-02614-0\_10}
+}
+
+@inproceedings{KellisonAppelBertotTassarotti2024VCFloat2,
+  author    = {Ariel E. Kellison and Andrew W. Appel and Mohit Tekriwal and David Bindel and Jean-Baptiste Tristan},
+  title     = {{LAProof}: A Library of Formal Verifications for Sparse Linear-Algebra Algorithms},
+  booktitle = {Proceedings of the 13th ACM SIGPLAN International Conference on Certified Programs
+               and Proofs (CPP 2024)},
+  pages     = {137--151},
+  publisher = {ACM},
+  year      = {2024},
+  doi       = {10.1145/3636501.3636953},
+  note      = {\todo{verify: cross-check VCFloat2 vs LAProof citation; the VCFloat 2 tool paper is by Andrew W. Appel and Ariel E. Kellison, ITP 2023}}
+}
+
+@inproceedings{Ramananandro2016CPP,
+  author    = {Tahina Ramananandro and Paul Mountcastle and Beno{\^i}t Meister and Richard Lethin},
+  title     = {A Unified {Coq} Framework for Verifying {C} Programs with Floating-Point Computations},
+  booktitle = {Proceedings of the 5th ACM SIGPLAN Conference on Certified Programs and Proofs (CPP 2016)},
+  pages     = {15--26},
+  publisher = {ACM},
+  year      = {2016},
+  doi       = {10.1145/2854065.2854066}
+}
+
+@book{Higham2002Accuracy,
+  author    = {Nicholas J. Higham},
+  title     = {Accuracy and Stability of Numerical Algorithms},
+  publisher = {SIAM},
+  edition   = {2nd},
+  year      = {2002}
+}
+
+@misc{IEEE754_2019,
+  author       = {{IEEE Computer Society}},
+  title        = {{IEEE} Standard for Floating-Point Arithmetic},
+  howpublished = {{IEEE Std 754-2019} (Revision of IEEE 754-2008)},
+  year         = {2019},
+  doi          = {10.1109/IEEESTD.2019.8766229}
+}
+
+% ---------------------------------------------------------------------
+%  Cost / amortised-complexity verification
+% ---------------------------------------------------------------------
+@inproceedings{CharguraudPottier2015UnionFind,
+  author    = {Arthur Charguéraud and François Pottier},
+  title     = {Machine-Checked Verification of the Correctness and Amortized Complexity of an
+               Efficient Union-Find Implementation},
+  booktitle = {Interactive Theorem Proving, 6th International Conference (ITP 2015)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {9236},
+  pages     = {137--153},
+  publisher = {Springer},
+  year      = {2015},
+  doi       = {10.1007/978-3-319-22102-1\_9}
+}
+
+@article{CharguraudPottier2019JAR,
+  author  = {Arthur Charguéraud and François Pottier},
+  title   = {Verifying the Correctness and Amortized Complexity of a Union-Find Implementation in
+             Separation Logic with Time Credits},
+  journal = {Journal of Automated Reasoning},
+  volume  = {62},
+  number  = {3},
+  pages   = {331--365},
+  year    = {2019},
+  doi     = {10.1007/s10817-017-9431-7}
+}
+
+@inproceedings{GueneauChargueraudPottier2018ESOP,
+  author    = {Armaël Guéneau and Arthur Charguéraud and François Pottier},
+  title     = {A Fistful of Dollars: Formalizing Asymptotic Complexity Claims via Deductive
+               Program Verification},
+  booktitle = {Programming Languages and Systems -- 27th European Symposium on Programming
+               (ESOP 2018)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {10801},
+  pages     = {533--560},
+  publisher = {Springer},
+  year      = {2018},
+  doi       = {10.1007/978-3-319-89884-1\_19}
+}
+
+@article{Lammich2019JAR,
+  author  = {Peter Lammich},
+  title   = {Refinement to {Imperative HOL}},
+  journal = {Journal of Automated Reasoning},
+  volume  = {62},
+  number  = {4},
+  pages   = {481--503},
+  year    = {2019},
+  doi     = {10.1007/s10817-017-9437-1}
+}
+
+@inproceedings{Lammich2019LLVM,
+  author    = {Peter Lammich},
+  title     = {Generating Verified {LLVM} from {Isabelle}/{HOL}},
+  booktitle = {10th International Conference on Interactive Theorem Proving (ITP 2019)},
+  series    = {LIPIcs},
+  volume    = {141},
+  pages     = {22:1--22:19},
+  publisher = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
+  year      = {2019},
+  doi       = {10.4230/LIPIcs.ITP.2019.22}
+}
+
+@inproceedings{Letouzey2002Extraction,
+  author    = {Pierre Letouzey},
+  title     = {A New Extraction for {Coq}},
+  booktitle = {Types for Proofs and Programs (TYPES 2002)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {2646},
+  pages     = {200--219},
+  publisher = {Springer},
+  year      = {2003},
+  doi       = {10.1007/3-540-39185-1\_12}
+}
+
+@article{Sozeau2020MetaCoq,
+  author  = {Matthieu Sozeau and Abhishek Anand and Simon Boulier and Cyril Cohen and
+             Yannick Forster and Fabian Kunze and Gregory Malecha and Nicolas Tabareau and
+             Théo Winterhalter},
+  title   = {The {MetaCoq} Project},
+  journal = {Journal of Automated Reasoning},
+  volume  = {64},
+  number  = {5},
+  pages   = {947--999},
+  year    = {2020},
+  doi     = {10.1007/s10817-019-09540-0}
+}
+
+@misc{CertiCoq2017,
+  author       = {Abhishek Anand and Andrew W. Appel and Greg Morrisett and
+                  Zoe Paraskevopoulou and Randy Pollack and Olivier Savary Belanger and
+                  Matthieu Sozeau and Matthew Weaver},
+  title        = {{CertiCoq}: A Verified Compiler for {Gallina}},
+  howpublished = {The Coq Workshop / CoqPL},
+  year         = {2017},
+  url          = {https://certicoq.org}
+}
+
+@inproceedings{Hoffmann2017RaML,
+  author    = {Jan Hoffmann and Ankush Das and Shu-Chun Weng},
+  title     = {Towards Automatic Resource Bound Analysis for {OCaml}},
+  booktitle = {Proceedings of the 44th ACM SIGPLAN Symposium on Principles of Programming
+               Languages (POPL 2017)},
+  pages     = {359--373},
+  publisher = {ACM},
+  year      = {2017},
+  doi       = {10.1145/3009837.3009842}
+}
+
+@inproceedings{CarbonneauxHoffmannRepsShao2017CAV,
+  author    = {Quentin Carbonneaux and Jan Hoffmann and Thomas W. Reps and Zhong Shao},
+  title     = {Automated Resource Analysis with {Coq} Proof Objects},
+  booktitle = {Computer Aided Verification, 29th International Conference (CAV 2017), Part II},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {10427},
+  pages     = {64--85},
+  publisher = {Springer},
+  year      = {2017},
+  doi       = {10.1007/978-3-319-63390-9\_4}
+}
+
+% ---------------------------------------------------------------------
+%  Misc supporting references
+% ---------------------------------------------------------------------
+@book{CLRS2022,
+  author    = {Thomas H. Cormen and Charles E. Leiserson and Ronald L. Rivest and Clifford Stein},
+  title     = {Introduction to Algorithms},
+  publisher = {The MIT Press},
+  edition   = {4th},
+  year      = {2022}
+}
+
+@book{Sedgewick2003GraphAlgorithms,
+  author    = {Robert Sedgewick},
+  title     = {Algorithms in {C}, Part 5: Graph Algorithms},
+  publisher = {Addison-Wesley Professional},
+  edition   = {3rd},
+  year      = {2002}
+}
+
+@misc{LeanFloat,
+  author       = {{The mathlib Community}},
+  title        = {{Mathlib4} -- {\tt Mathlib.Data.Float.Basic}},
+  howpublished = {GitHub repository \texttt{leanprover-community/mathlib4}},
+  year         = {2024},
+  url          = {https://leanprover-community.github.io/mathlib4_docs/Mathlib/Data/Float/Basic.html}
+}
+
+@misc{GraphsBenchRepo,
+  author       = {{The graphs-bench authors}},
+  title        = {{\tt graphs-bench}: A {Rust} implementation and {Lean 4} verification of
+                  shortest-path algorithms},
+  howpublished = {GitHub repository},
+  year         = {2025},
+  note         = {\todo{insert canonical URL once published}}
+}

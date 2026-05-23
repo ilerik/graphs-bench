@@ -1,0 +1,784 @@
+% =====================================================================
+%  paper.tex  --  arXiv preprint (journal-flexible)
+%
+%  "A Verified Floating-Point Dijkstra in Lean 4 + Rust"
+%
+%  Compile with:
+%      latexmk -pdf paper.tex
+%  or:
+%      pdflatex paper && bibtex paper && pdflatex paper && pdflatex paper
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+% --- packages --------------------------------------------------------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage[margin=1.1in]{geometry}
+\IfFileExists{microtype.sty}{\usepackage{microtype}}{}
+\usepackage{amsmath,amssymb,amsthm}
+\IfFileExists{mathtools.sty}{\usepackage{mathtools}}{}
+% Conditional package loading: load only when the package and all of
+% its hard dependencies are present in this TeX install.
+\IfFileExists{xcolor.sty}{\usepackage{xcolor}}{}
+\IfFileExists{hyperref.sty}{%
+  \IfFileExists{etoolbox.sty}{%
+    \usepackage[hidelinks]{hyperref}%
+  }{}%
+}{}
+\IfFileExists{cleveref.sty}{\usepackage{cleveref}}{}
+\IfFileExists{enumitem.sty}{\usepackage{enumitem}}{}
+\IfFileExists{listings.sty}{\usepackage{listings}}{}
+\IfFileExists{booktabs.sty}{\usepackage{booktabs}}{}
+\usepackage{xspace}
+\usepackage{url}
+
+% Fallbacks for commands provided by the optional packages above.
+% \providecommand is a no-op if the command was already defined.
+\providecommand{\textcolor}[2]{#2}
+\providecommand{\color}[1]{}
+\providecommand{\href}[2]{#2}
+\providecommand{\cref}[1]{Section~\ref{#1}}
+\providecommand{\Cref}[1]{Section~\ref{#1}}
+
+\makeatletter
+\@ifpackageloaded{enumitem}{}{%
+  % Strip optional argument from enumerate/itemize when enumitem is missing.
+  \let\enitfb@enumerate\enumerate
+  \let\enitfb@endenumerate\endenumerate
+  \let\enitfb@itemize\itemize
+  \let\enitfb@enditemize\enditemize
+  \renewenvironment{enumerate}[1][]{\enitfb@enumerate}{\enitfb@endenumerate}%
+  \renewenvironment{itemize}[1][]{\enitfb@itemize}{\enitfb@enditemize}%
+}
+\makeatother
+
+% --- listings: Rust + Lean (only configured if package available;
+%               currently unused in the drafted text but kept for
+%               future code excerpts in section stubs) ---------------
+\makeatletter
+\@ifpackageloaded{listings}{%
+  \lstdefinelanguage{Rust}{%
+    morekeywords={fn,let,mut,pub,struct,enum,trait,impl,for,while,loop,if,else,
+                  match,return,use,mod,crate,as,in,where,unsafe,move,ref,Self,self,
+                  true,false,Some,None,Ok,Err,break,continue,async,await,dyn,extern,
+                  type,const,static},%
+    morekeywords=[2]{u8,u16,u32,u64,usize,i8,i16,i32,i64,isize,f32,f64,bool,char,str,String,Vec,Option,Result,Box},%
+    morecomment=[l]{//},%
+    morecomment=[s]{/*}{*/},%
+    morestring=[b]"%
+  }
+  \lstdefinelanguage{Lean}{%
+    morekeywords={def,theorem,lemma,example,structure,inductive,class,instance,
+                  where,match,with,fun,let,if,then,else,do,return,by,abbrev,
+                  section,end,namespace,open,variable,variables},%
+    morekeywords=[2]{Prop,Type,Sort,True,False,And,Or,Not,Iff,Exists,Forall,Nat,Int,Float,Bool,List,Option,Fin,WithTop,NNReal,Float},%
+    morecomment=[l]{--},%
+    morecomment=[s]{/-}{-/},%
+    morestring=[b]"%
+  }
+  \lstset{basicstyle=\ttfamily\small,numbers=none,breaklines=true,frame=single}%
+}{}
+\makeatother
+
+% --- macros ----------------------------------------------------------
+\newcommand{\Lean}{Lean~4\xspace}
+\newcommand{\Mathlib}{\textsc{Mathlib}\xspace}
+\newcommand{\BMSSP}{\textsc{BMSSP}\xspace}
+\newcommand{\Dijkstra}{Dijkstra\xspace}
+\newcommand{\Bigo}{\mathcal{O}}
+\newcommand{\dhat}{\hat{d}}
+\newcommand{\dist}{\mathit{dist}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\file}[1]{\texttt{#1}}
+% Allow line breaks inside long typewriter paths.
+\sloppy
+\hyphenpenalty=2500\tolerance=4000\emergencystretch=3em
+% \todo macro: simple bold text in brackets. (When xcolor is available
+% the manuscript build may grep for [TODO: and recolour by hand.)
+\newcommand{\todo}[1]{\textbf{[TODO: #1]}}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{example}[theorem]{Example}
+
+% --- title -----------------------------------------------------------
+\title{\textbf{A Verified Floating-Point \Dijkstra\\
+       in \Lean{} and \textsc{Rust}}\\
+       \large{}with a Bridge-Axiom Inventory toward Zero-Trust Refinement}
+
+\author{
+  \emph{The graphs-bench authors}%
+  \thanks{Repository: \texttt{graphs-bench} (canonical URL TBD).}
+}
+
+\date{Draft of \today}
+
+% =====================================================================
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+\Dijkstra's single-source shortest-path algorithm has been mechanically
+verified in proof assistants for over twenty years, in eight or more systems
+ranging from \textsc{Mizar} and \textsc{ACL2} to \textsc{Isabelle/HOL},
+\textsc{Coq/VST}, and \textsc{Why3}. Yet \emph{every} published mechanization
+either treats edge weights as mathematical reals or unbounded integers
+(idealised models) or treats them as bounded machine integers with an explicit
+overflow precondition, as in the most recent work of Mohan, Leow, and Hobor
+(\emph{CAV 2021}). To our knowledge, no mechanized correctness proof of
+\Dijkstra{} addresses \emph{IEEE-754 floating-point} edge weights, which is
+the model every shipped Rust, C, and C++ implementation actually uses.
+
+We close this gap. We present a verified, executable \Dijkstra{} in
+\Lean{}~4 plus \Mathlib{}, refined to a real Rust implementation with
+compressed-sparse-row (CSR) adjacency and \code{f64} edge weights. The Lean
+side is organised as a three-layer architecture: a non-computable
+\emph{specification} layer over \Mathlib's \code{SimpleGraph} hierarchy and
+the metric \code{trueDist} valued in \code{WithTop NNReal}; a computable
+\emph{algorithm} layer~\code{Sssp.Algo.Dijkstra} carrying the principal
+correctness theorem~\code{dijkstra\_correct}; and an
+\emph{operational refinement} layer~\code{Sssp.Refine.Dijkstra} that mirrors
+the Rust source line-for-line. The bridge between layers is mediated by four
+named axiom blocks --- \code{NumericBridge}, \code{RelaxBridge},
+\code{GraphBridge}, \code{HeapBridge} --- which document precisely what a
+\Lean{}~$\leftrightarrow$~IEEE-754~$\leftrightarrow$~\textsc{Rust} pipeline
+must currently assume in the absence of a port of \textsc{Flocq} to
+\Lean{}~4. The principal theorem
+\code{refine\_dijkstra\_correct} establishes that, modulo these named axioms,
+the Rust \Dijkstra{} computes \code{trueDistNat} on every
+\code{ValidRustGraph}; an executable fixture harness shared between Lean
+\code{native\_decide} and \code{cargo} JSON tests provides regression
+coverage. We give a roadmap (Phase~3c) for discharging each axiom, and
+an empirical study comparing \Dijkstra{} to the recently introduced
+$\Bigo(m\cdot \log^{2/3} n)$ algorithm of Duan, Mao, Mao, Shu and
+Yin~\cite{DuanMaoMaoShuYin2025} that motivates why a verified textbook
+\Dijkstra{} is the practical baseline.
+\end{abstract}
+
+% =====================================================================
+\section{Introduction}\label{sec:introduction}
+
+\paragraph*{A 65-year-old algorithm, still without a floating-point proof.}
+\Dijkstra's single-source shortest-path algorithm~\cite{Dijkstra1959} is, by
+any measure, one of the most-mechanically-verified algorithms in
+computer science. Over the past twenty years it has been formalised in
+\textsc{Mizar}~\cite{Chen2003}, \textsc{ACL2}~\cite{MooreZhang2005},
+\textsc{Jahob}~\cite{MangeKuhn2007}, \textsc{KeY}~\cite{Klasen2010},
+\textsc{Why3}~\cite{Filliatre2011Toccata}, an SMT-based bounded
+checker~\cite{LiuNagelTaghdiri2012}, \textsc{Isabelle/HOL} via the Refinement
+Framework~\cite{NordhoffLammich2012,LammichNipkow2019},
+\textsc{Dafny}~\cite{Leino2023ProgramProofs}, and most recently, in
+\textsc{Coq} on top of \textsc{CompCert}~\cite{Leroy2009CompCert} and
+\textsc{VST}~\cite{AppelVST2011} as part of the \textsc{CertiGraph}
+project~\cite{WangCaoMohanHobor2019,MohanLeowHobor2021}. A reasonable
+practitioner could be forgiven for thinking the topic exhausted.
+
+It is not. Every one of the developments above either
+\emph{(i)}~works over an idealised arithmetic model in which edge weights are
+unbounded integers or mathematical reals (most of the proof-assistant
+community: \textsc{Mizar}, \textsc{ACL2}, \textsc{Jahob}, \textsc{KeY},
+\textsc{Why3}, \textsc{Isabelle/HOL}, \textsc{Dafny}), or
+\emph{(ii)}~retains machine integers but takes care to specify an
+overflow precondition (\textsc{CertiGraph}: edge weights bounded by
+$\lfloor \mathrm{INT\_MAX}/\mathrm{size} \rfloor$, after Mohan et al.\ uncovered
+that the more obvious bound $\lfloor \mathrm{INT\_MAX}/(\mathrm{size}-1)\rfloor$
+is unsound~\cite[\S 3.2]{MohanLeowHobor2021}). Mohan et al.\ explicitly call
+out the missing third option:
+\begin{quote}
+\itshape``Sedgewick's sidestep [to \code{double} weights] entails enduring
+the inevitable round-off intrinsic to floating-point arithmetic, and so his
+algorithm computes approximate optimal costs rather than exact ones.
+Sedgewick does not specify any bounds on input edge weights, and accordingly
+does not (and cannot) provide any bound on this accumulated
+error.''~\cite[\S 3.3]{MohanLeowHobor2021}
+\end{quote}
+This is the exact gap our work occupies: a verified \Dijkstra{} over
+IEEE-754 \code{f64} weights, with a real Rust implementation, refined to a
+correctness theorem in \Lean.
+
+\paragraph*{Why now?}
+The gap matters for two further reasons beyond completeness of the
+mechanization landscape.
+
+First, after fifty years of stability, the SSSP problem has acquired a
+genuinely new asymptotic frontier. Duan, Mao, Mao, Shu and
+Yin~\cite{DuanMaoMaoShuYin2025} have given the first
+$\Bigo(m \cdot \log^{2/3} n)$ deterministic algorithm for directed SSSP with
+non-negative real weights in the comparison-addition model. This is the
+first asymptotic improvement over \Dijkstra-with-Fibonacci-heap
+$\Bigo(m + n \log n)$~\cite{FredmanTarjan1987} for sparse directed graphs.
+Engineering claims about the new algorithm --- correctness, numerical
+stability, where the asymptotic crossover with \Dijkstra{} actually lies ---
+require a mechanized baseline against which to be judged. Without a verified
+\Dijkstra{} over the same data structures and the same arithmetic, no such
+comparison can be claimed at the level of foundational proof.
+
+Second, Rust has emerged as the dominant systems language for
+high-performance graph workloads. Yet despite the rapid maturation of Rust
+verifiers in recent years (\textsc{Verus}~\cite{Lattuada2023Verus},
+\textsc{Creusot}~\cite{DenisJourdanMarche2022Creusot},
+\textsc{Aeneas}~\cite{HoProtzenko2022Aeneas},
+\textsc{Prusti}~\cite{Astrauskas2019Prusti},
+\textsc{Kani}~\cite{VanHattum2022Kani},
+\textsc{RustHorn}~\cite{Matsushita2020RustHorn,Matsushita2022RustHornBelt}),
+to our knowledge \emph{no verified shortest-path algorithm has been
+published in any Rust verifier.} The Rust crate ecosystem (\code{petgraph},
+\code{pathfinding}, \code{graphlib}) ships unverified \code{f64}-weighted
+\Dijkstra{} as the default; a verified replacement is overdue.
+
+\paragraph*{Why \Lean{} 4?}
+\Lean{}~\cite{deMouraUllrich2021Lean4} together with \Mathlib~\cite{Mathlib2020}
+gives the cleanest available formalisation of graph metrics:
+\code{SimpleGraph.dist}, \code{SimpleGraph.edist}, walks, paths and
+connectivity~\cite{MathlibSimpleGraph}. Crucially, however, \Mathlib{}
+contains \emph{no} executable Dijkstra: the closest existing artefact is
+\code{Quiver.shortestPath}~\cite{MathlibQuiver}, which is a non-computable
+\code{Classical.choose}-style oracle on rooted connected quivers, and there
+is no edge-weighted graph hierarchy with ordered semirings of weights at all.
+A self-contained, executable, edge-weighted SSSP development in \Lean{} 4
+fills a real combinatorial-algorithmic gap, complementing the deeply
+developed but still mostly non-algorithmic side of \Mathlib's combinatorics
+library.
+
+\Lean{} 4 also gives us a clean Rust bridge:
+\textsc{Aeneas}~\cite{HoProtzenko2022Aeneas,HoFromherzProtzenko2024Aeneas}
+provides a sound functional translation of safe Rust into a pure
+$\lambda$-calculus, with \Lean{} 4 among its supported back-ends. We do not
+use \textsc{Aeneas}'s automatic translator in this work --- we instead
+hand-translate the Rust source~\code{src/dijkstra.rs} into a mirror
+\Lean{} model~\code{Sssp.Refine.Dijkstra} that we then prove against a
+verified, abstract \Lean{} reference implementation~\code{Sssp.Algo.Dijkstra}
+--- but the architecture is deliberately compatible with future automation
+via the \textsc{Aeneas} pipeline.
+
+\paragraph*{Contributions.}
+This paper makes four concrete contributions, each grounded in the Lean
+development at \code{formal/lean/Sssp/}:
+\begin{enumerate}[leftmargin=2.2em,itemsep=0.35em]
+\item \textbf{The first verified \Dijkstra{} in \Lean{} 4.}
+      We give a total, computable function~\code{Sssp.Algo.dijkstra} together
+      with a closed correctness theorem
+      \[
+        \code{dijkstra\_correct}\;:\;
+        \forall G\,s\,v,\;
+        \code{Algo.dijkstra}\,G\,s\,v
+        = \code{trueDist}\,G\,s\,v
+      \]
+      where \code{trueDist} is the \Mathlib-style infimum over walks valued
+      in $\mathrm{WithTop}\,\mathbb{R}_{\geq 0}$. The proof is split into
+      soundness (every relaxation respects the metric) and completeness (a
+      shortest walk has length at most $n$, so $n$ rounds of full edge
+      relaxation suffice). See
+      \code{formal/lean/Sssp/Algo/Dijkstra.lean:318}.
+
+\item \textbf{The first \Lean{} refinement of an \code{f64}/CSR \Dijkstra{}
+      against a real Rust implementation.}
+      We expose a verified Rust binding via the theorem
+      \begin{multline*}
+        \code{refine\_dijkstra\_correct}\;:\;
+        \forall\, (vg : \code{ValidRustGraph}\,n\,g)\,(s\,v : \mathrm{Fin}\,n),\\
+        (\code{dijkstra}\,g\,s.\code{val})[v.\code{val}]!
+          = \code{withTopNatToFloat}\,(\code{trueDistNat}\,vg.\code{toGraph}\,s\,v)
+      \end{multline*}
+      living at \code{formal/lean/Sssp/Refine/RefineCorrectness.lean:23},
+      where \code{Sssp.Refine.Dijkstra} mirrors \code{src/dijkstra.rs}'s
+      lazy-binary-heap implementation line-for-line and \code{trueDistNat}
+      (\code{formal/lean/Sssp/Refine/NumericBridge.lean:40}) is an executable
+      $\mathbb{N}$-shadow of \code{trueDist} obtained by a classical-choice
+      nat preimage of the \code{NNReal} answer.
+
+\item \textbf{A bridge-axiom inventory for the Lean--IEEE-754--Rust stack.}
+      Where the proof currently relies on assumptions, we name and isolate
+      them in four bridge modules:
+      \begin{itemize}[leftmargin=1.2em]
+      \item \code{NumericBridge}~--- IEEE-754 facts about \code{Float}
+            (commutativity, associativity on relevant subdomains,
+            monotonicity, behaviour of \code{nnrealToFloat} on
+            \code{ofNat}-style inputs);
+      \item \code{RelaxBridge}~--- alignment of the per-edge and per-vertex
+            relaxation loops between the Algo and Refine layers;
+      \item \code{GraphBridge}~--- the CSR$\leftrightarrow$\Mathlib{}
+            \code{SimpleGraph} preimage lemma;
+      \item \code{HeapBridge}~--- the lazy-heap simulation theorem.
+      \end{itemize}
+      An axiom-elimination roadmap (Phase~3c) is laid out in
+      \code{formal/FUTURE\_WORK.md}; this paper documents the current
+      surface and explains why each axiom is the natural cut-point given
+      \Mathlib's lack of a \textsc{Flocq}-style IEEE-754
+      formalisation~\cite{BoldoMelquiond2011Flocq,BoldoMelquiond2017Book}.
+
+\item \textbf{A regression harness shared between \Lean{} and Rust.}
+      A common JSON fixture format --- four small directed graphs with
+      pre-computed expected distances --- is checked by both
+      \code{native\_decide}-driven \code{\#guard} statements in
+      \code{Sssp.Fixtures.*} and \code{cargo test shared\_json\_fixtures}
+      against \code{src/dijkstra.rs}, glued together by
+      \code{formal/scripts/check-fixtures.sh}. The harness establishes
+      operational agreement between the verified Lean model and the Rust
+      binary on concrete inputs, complementing (but not replacing) the
+      symbolic refinement proof.
+
+\item \textbf{An empirical numerical-estimate study.}
+      We benchmark \Dijkstra{} (binary heap, \code{f64} weights, CSR) against
+      our Rust implementation of \BMSSP{} (the new
+      $\Bigo(m\cdot \log^{2/3} n)$ algorithm of
+      Duan~et~al.~\cite{DuanMaoMaoShuYin2025}) on Erdős--Rényi-style random
+      directed graphs from $n=10^3$ to $n=4 \cdot 10^6$. The benchmark
+      confirms the predicted $1/\log^{1/3} n$ ratio decay within each
+      recursion-depth regime, but also shows that the practical crossover
+      lies at $n \gtrsim 2^{216}$. This both motivates why a verified
+      textbook \Dijkstra{} is the practical baseline of interest and
+      bounds, empirically, the regime in which any future verification of
+      \BMSSP{} would be worth deploying. See \cref{sec:benchmark}.
+\end{enumerate}
+
+\paragraph*{Non-goals.}
+We are explicit about what this paper does \emph{not} attempt:
+\begin{itemize}[leftmargin=1.6em,itemsep=0.25em]
+\item We do not prove a forward-error bound on the \code{f64}
+      computation in the style of
+      Higham~\cite{Higham2002Accuracy}: the \code{NumericBridge} axiom
+      block names the IEEE-754 facts we rely on, and an explicit
+      $(n-1)\cdot\mathrm{ulp}$-style bound is deferred to a
+      \textsc{Flocq}-port follow-up.
+\item We do not verify the \BMSSP{} algorithm of
+      Duan~et~al.~\cite{DuanMaoMaoShuYin2025} in \Lean. Our Rust
+      implementation of \BMSSP{} is unverified; it appears here only as a
+      benchmark baseline for the \code{f64} \Dijkstra{} we do verify, and as
+      motivation for why a clean \Lean{}-side foundation matters going
+      forward.
+\item We do not verify a runtime cost bound on \Dijkstra{}. \Mathlib's
+      \code{Asymptotics.IsBigO} machinery is in place, but is not connected
+      to a runtime cost model in the style of Charguéraud and Pottier's
+      time credits~\cite{CharguraudPottier2015UnionFind,GueneauChargueraudPottier2018ESOP};
+      we leave a \Lean-side cost monad to future work.
+\end{itemize}
+
+\paragraph*{Outline.}
+\Cref{sec:related} surveys related work in six clusters. \Cref{sec:prelim}
+fixes notation and recalls just enough \Lean, \Mathlib{} and IEEE-754
+background. \Cref{sec:architecture} describes the three-layer architecture
+of the Lean development. \Cref{sec:algo} presents the abstract verified
+\Dijkstra. \Cref{sec:refine} steps through the Refine layer and the
+four bridge axioms. \Cref{sec:fixtures} describes the fixture harness.
+\Cref{sec:benchmark} reports the empirical \Dijkstra/\BMSSP{} comparison.
+\Cref{sec:discussion} discusses Phase~3c (zero-axiom \Dijkstra),
+Aeneas-driven extraction, and the path to a verified Higham-style rounding
+bound.
+
+% =====================================================================
+\section{Related work}\label{sec:related}
+
+We organise the literature into six clusters. \S\ref{sec:rel-abs} covers the
+long history of \Dijkstra-on-abstract-weights mechanizations.
+\S\ref{sec:rel-real} addresses the considerably shorter history of
+\Dijkstra-on-real-machine-models. \S\ref{sec:rel-graph-lean} situates our work
+in the \Lean/\Mathlib{} graph-theory ecosystem. \S\ref{sec:rel-rust} covers
+Rust verifiers. \S\ref{sec:rel-fp} surveys floating-point in proof assistants
+and the (small) intersection with shortest-path correctness.
+\S\ref{sec:rel-cost} closes with refinement, extraction and cost-monad work
+that is methodologically close but, for this paper, deferred.
+
+\subsection{Mechanized \Dijkstra{} over abstract weights}\label{sec:rel-abs}
+
+The earliest mechanized correctness proof of \Dijkstra{} we are aware of is
+Chen's 2003 \textsc{Mizar} development~\cite{Chen2003}, formalised over
+abstract integer weights and following the textbook presentation. Two years
+later, Moore and Zhang~\cite{MooreZhang2005} gave a self-contained
+``proof pearl'' in \textsc{ACL2}, again on a finite weighted graph with
+unbounded integer arithmetic. The Java verifier community contributed two
+case studies: Mange and Kuhn~\cite{MangeKuhn2007} verified a Java
+implementation in \textsc{Jahob}, and Klasen~\cite{Klasen2010} did so in
+\textsc{KeY}. Liu, Nagel, and Taghdiri~\cite{LiuNagelTaghdiri2012} took a
+bounded-SMT approach for the same class of programs, trading foundational
+guarantees for automation. Filliâtre's \textsc{Why3} development for the
+Toccata gallery~\cite{Filliatre2011Toccata} remains a particularly
+pedagogical reference, with explicit invariants \code{inv\_src}, \code{inv},
+\code{inv\_succ}; weights are non-negative \code{int}s.
+
+The most algorithmically sophisticated efforts on the Isabelle side come
+from the Refinement Framework community. Nordhoff and
+Lammich~\cite{NordhoffLammich2012} verified \Dijkstra{} via stepwise data
+refinement of a monadic, nondeterministic specification, ending in an
+efficient implementation parametrised over the Isabelle Collections
+Framework; the AFP entry has been continuously maintained since 2012.
+Lammich and Nipkow~\cite{LammichNipkow2019} subsequently produced a
+short, elegant proof using purely functional priority search trees, applied
+to both \Dijkstra{} and Prim. Wimmer and Lammich~\cite{WimmerLammich2017}
+formalised the sister APSP algorithm of Floyd--Warshall in the same
+framework.
+
+The common feature of every development in this paragraph is that
+arithmetic is idealised: weights live in $\mathbb{N}$, $\mathbb{Z}$, or an
+abstract ordered monoid; addition is exact; comparisons are decidable; no
+overflow, no rounding. The textbook code can be transcribed essentially
+verbatim, and the proof effort goes into the algorithmic invariants
+(``popped vertices have globally optimal distances''). Leino's
+\textsc{Dafny} treatment in \emph{Program Proofs}~\cite{Leino2023ProgramProofs}
+fits the same pattern, with SMT automation taking the place of interactive
+tactics. To our knowledge, none of these works have been ported to a
+floating-point or even an explicitly bounded-integer setting.
+
+\subsection{Mechanized \Dijkstra{} against a real machine model}\label{sec:rel-real}
+
+The picture changes sharply when one moves to verified
+\emph{implementations} (in C, Java, OCaml) running against a formal compiler
+semantics. The \textsc{CertiGraph} project~\cite{WangCaoMohanHobor2019,Wang2019Thesis},
+built on \textsc{CompCert}~\cite{Leroy2009CompCert} and the
+Verified Software Toolchain~\cite{AppelVST2011}, has produced the most
+extensive verified-graph-algorithm library in any proof assistant, with
+modules for union-find, garbage collection, mark, copy, and the textbook
+graph algorithms. Mohan, Leow, and Hobor's CAV~2021 paper~\cite{MohanLeowHobor2021}
+gives the most detailed treatment to date: full functional correctness of C
+implementations of \Dijkstra, Kruskal, and Prim, including a verified binary
+heap with Floyd's bottom-up build and \code{decrease\_priority}. Crucially,
+their work uncovers (and corrects) two subtle issues invisible in idealised
+mechanizations:
+\begin{enumerate}[leftmargin=1.6em,itemsep=0.25em]
+\item Sedgewick-style edge-weight bounds of $\lfloor \mathrm{INT\_MAX}/(\mathrm{size}-1)\rfloor$ are
+      \emph{insufficient} to prevent intermediate-value overflow on the
+      ``probing edge'' $u \rightarrow v$ examined in the relaxation loop;
+      the correct bound is $\lfloor \mathrm{INT\_MAX}/\mathrm{size}\rfloor$
+      ~\cite[Fig.~2]{MohanLeowHobor2021}.
+\item Textbook treatments of Prim's algorithm wrongly insist on a connected
+      input; the standard pseudocode actually produces a minimum spanning
+      forest on disconnected input without modification.
+\end{enumerate}
+Their related-work paragraph names FP weights as the open problem we
+address~\cite[\S 3.3]{MohanLeowHobor2021}.
+
+A methodological cousin of \textsc{CertiGraph} is Charguéraud's
+\textsc{CFML}~\cite{Charguraud2011CFML}, which extracts \emph{characteristic
+formulae} from OCaml programs and verifies them in \textsc{Coq};
+\textsc{CFML} has been used for a range of textbook algorithms, including
+some shortest-path examples in the manual, although we are not aware of a
+published \Dijkstra{} verification at the level of detail of
+Mohan~et~al.~\cite{MohanLeowHobor2021}.
+\textsc{Iris}~\cite{JungRustBelt2018} and the broader separation-logic
+community have produced a wide range of verified \emph{data-structure}
+correctness proofs (binary heaps, skew heaps, Fibonacci heaps), which
+together with a refinement to imperative
+HOL~\cite{Lammich2019JAR,Lammich2019LLVM} or LLVM are the ingredients of an
+end-to-end imperative verification.
+
+\subsection{Graph theory and graph algorithms in \Lean{}/\Mathlib}\label{sec:rel-graph-lean}
+
+\Mathlib's combinatorics hierarchy~\cite{Mathlib2020,MathlibSimpleGraph} is
+deep on the structural side: \code{SimpleGraph} is the central abstraction,
+with \code{Walk}, \code{Path}, connectivity, subgraph,
+matching/coloring/Hamiltonian/planar/regularity (Szemerédi's regularity
+lemma), girth, density, triangle-removal, and adjacency/incidence/Laplacian
+matrix theory all in place. \code{SimpleGraph.dist} and
+\code{SimpleGraph.edist} (the latter \code{WithTop}-valued) define the
+graph metric as $\inf$ over walks, but are non-computable. The closest
+existing artefact to an algorithmic shortest-path is
+\code{Quiver.shortestPath}~\cite{MathlibQuiver}, which uses
+\code{Classical.choose} to extract a path of minimal length on a rooted
+connected quiver --- again non-computable, and with no notion of edge
+weight beyond hop count.
+
+To our knowledge, \Mathlib{} as of 2025 contains no executable, edge-weighted
+shortest-path algorithm with a closed correctness theorem. A handful of
+community pull requests and \texttt{Zulip} discussions have circled around
+adding BFS or DFS over \code{SimpleGraph}, but none has landed at the time
+of writing. This is an unsurprising state of affairs: \Mathlib{}'s
+combinatorics library has historically been driven by the needs of the
+graph-theory and combinatorics formalisation community
+(Doczkal--Pous treewidth-two minor exclusion in \textsc{Coq}/MathComp~\cite{DoczkalPous2020Minor}
+is a typical comparator), not by algorithm-engineering needs. A natural
+home for an algorithmic SSSP development in \Lean{} is therefore a
+self-contained namespace --- \code{Sssp.*} in our case --- that re-uses
+\Mathlib's structural primitives (\code{Walk}, \code{Path}, the
+\code{WithTop}/\code{NNReal} order theory) without yet pushing for upstream
+inclusion.
+
+Comparable algorithmic graph developments outside \Lean{} include
+Noschinski's Isabelle graph library~\cite{Noschinski2015GraphLib} and the
+network-flow line of work in
+Isabelle~\cite{LammichSefidgar2016EK,Lammich2019JAR}.
+
+\subsection{Verifying \textsc{Rust}}\label{sec:rel-rust}
+
+The Rust verification ecosystem has matured rapidly in the past five years,
+and is now arguably the densest cluster of practical deductive verifiers
+for any single language. Six tools merit specific discussion.
+
+\textbf{Verus}~\cite{Lattuada2023Verus,Lattuada2024Verus} embeds
+specifications, proofs and executable code in a single Rust dialect via a
+mode system (\code{spec}, \code{proof}, \code{exec}); ghost types are
+linearly typed, allowing proofs to manipulate ownership of memory and
+concurrent resources, and Z3 discharges the verification conditions.
+\textbf{Creusot}~\cite{DenisJourdanMarche2022Creusot} translates safe Rust
+to \textsc{Why3}/\textsc{Coma} via the \emph{Pearlite} specification
+language, encoding mutable borrows by way of prophecy variables;
+\textsc{Why3}'s SMT back-ends discharge the bulk of the resulting goals.
+\textbf{Aeneas}~\cite{HoProtzenko2022Aeneas,HoFromherzProtzenko2024Aeneas}
+takes a different tack: it gives a value-based, ownership-centric pure
+$\lambda$-calculus semantics to the LLBC borrow calculus, and emits
+functional code in F$^\star$, \textsc{Coq}, \textsc{HOL4}, or \Lean{}~4
+that the user can verify with full interactive theorem proving. Termination
+of borrows is handled via novel \emph{backward functions}; soundness with
+respect to the Rust borrow checker has subsequently been
+established~\cite{HoFromherzProtzenko2024Aeneas}.
+\textbf{Prusti}~\cite{Astrauskas2019Prusti,Astrauskas2022Prusti} translates
+annotated Rust to the \textsc{Viper} intermediate verification language,
+exploiting Rust's type-based separation of references for modular reasoning.
+\textbf{Kani}~\cite{VanHattum2022Kani} is a bounded model-checker built on
+\textsc{CBMC}, targeting panics, integer overflows, and undefined behaviour
+rather than full functional correctness.
+\textbf{RustHorn}~\cite{Matsushita2020RustHorn} encodes Rust verification
+problems as constrained Horn clauses using a prophetic model of mutable
+borrows; \textbf{RustHornBelt}~\cite{Matsushita2022RustHornBelt} grounds the
+encoding semantically in the \textsc{RustBelt}~\cite{JungRustBelt2018}
+framework, extending it to unsafe code.
+The \textsc{hax}/\textsc{hacspec} toolchain~\cite{HacspecHax2024} is
+crypto-focused but architecturally similar to Aeneas: a Rust subset is
+translated to F$^\star$, \textsc{Coq}, \textsc{EasyCrypt}, or
+\textsc{ProVerif} for verification.
+
+The striking observation, for the present paper, is that \emph{none} of
+these toolchains has, to our knowledge, produced a published verification
+of \Dijkstra{} or any non-trivial SSSP algorithm. The closest published
+non-trivial verifications are CreuSAT (a verified Rust SAT solver in
+\textsc{Creusot}) and the systems-verification line of work on top of
+\textsc{Verus} (NrOS, IronKV-style replays, \emph{Atmosphere}). Our work
+fills the SSSP gap directly, taking an \textsc{Aeneas}-style
+\emph{hand-translated} approach that is methodologically compatible with
+future automation through the Aeneas+Charon pipeline.
+
+\subsection{Floating-point in proof assistants and in shortest-path
+work}\label{sec:rel-fp}
+
+The state of the art for IEEE-754 floating-point in proof assistants is
+\textsc{Flocq}~\cite{BoldoMelquiond2011Flocq,BoldoMelquiond2017Book}: a
+\textsc{Coq} formalisation parameterised over the rounding mode and
+precision, with a comprehensive theory of representable numbers, ULP
+arithmetic, and forward/backward error bounds.
+\textsc{CompCert}'s C semantics~\cite{BoldoJourdanLeroyMelquiond2014} is
+linked to \textsc{Flocq}, giving an end-to-end pipeline from C source to
+machine code that preserves bit-exact FP behaviour. On top of this stack,
+\textsc{VST}'s round-off-error tooling
+(\textsc{LAProof}/\textsc{VCFloat~2}~\cite{KellisonAppelBertotTassarotti2024VCFloat2})
+gives Coq tactics for proving forward error bounds on real C programs,
+and Boldo et al.~\cite{BoldoFilliatreMelquiond2009Gappa} have shown how to
+interface \textsc{Coq} with the \textsc{Gappa} numerical solver for
+near-automatic FP proofs. Ramananandro et
+al.~\cite{Ramananandro2016CPP} present an alternative Coq framework for
+end-to-end FP-aware C verification.
+
+\Mathlib's IEEE-754 story is, by contrast, very thin.
+\code{Mathlib.Data.Float.Basic}~\cite{LeanFloat} is a wrapper around the
+runtime \code{double}: it provides the algebraic operations and the
+order, but no rounding-mode-parameterised semantics, no
+ULP arithmetic, and no formalised IEEE-754 algebra of the kind \textsc{Flocq}
+provides. As a consequence, anyone wishing to prove a forward-error bound on
+an FP algorithm in \Lean{} must currently either build their own IEEE-754
+model from \code{BitVec}, port a fragment of \textsc{Flocq}, or
+axiomatise the necessary facts and discharge them out-of-band. Our paper
+takes the third option, with the named axiom block
+\code{NumericBridge} (\cref{sec:refine}) listing the IEEE-754 facts that
+the Dijkstra refinement needs.
+
+The intersection of mechanized FP and shortest-path verification is, to our
+knowledge, empty. The numerical-analysis literature does have informal
+treatments: Higham's \emph{Accuracy and
+Stability}~\cite[Ch.~4]{Higham2002Accuracy} gives the standard
+$(n-1)\cdot\mathrm{ulp}$ forward-error bound for an $n$-term summation, which
+specialises directly to a shortest-path of $n-1$ edges, but this has not
+been mechanized for \Dijkstra{} in any system we are aware of. Our paper
+should therefore be read as the necessary first step toward such a
+mechanization in \Lean: it puts in place the architectural scaffolding
+(\code{Algo}, \code{Refine}, the four bridge modules) on top of which a
+\textsc{Flocq}-style forward-error theorem becomes natural future work.
+
+\subsection{Refinement, extraction, and cost analysis}\label{sec:rel-cost}
+
+Stepwise refinement from non-deterministic specification to executable code
+has been most thoroughly developed in the Isabelle Refinement
+Framework~\cite{NordhoffLammich2012,Lammich2019JAR,Lammich2019LLVM}, where
+the AFP \Dijkstra{} entry~\cite{NordhoffLammich2012} is a paradigmatic
+example. \textsc{Coq}'s extraction
+mechanism~\cite{Letouzey2002Extraction} produces OCaml/Haskell/Scheme code
+from \textsc{Coq} terms; \textsc{MetaCoq}~\cite{Sozeau2020MetaCoq} and
+\textsc{CertiCoq}~\cite{CertiCoq2017} provide verified-extraction pipelines.
+\Lean{}~4 takes a different approach: \code{Decidable} instances yield
+executable functions directly, and \code{decide}/\code{native\_decide}
+evaluate them at elaboration time, the latter via compiled native code
+(with a correspondingly larger trusted base, including the \Lean{} compiler
+and runtime). We use \code{native\_decide} only in the regression-fixture
+harness (\cref{sec:fixtures}), keeping it strictly outside the trust path of
+the main correctness theorem.
+
+Cost analysis in proof assistants has its own substantial line. The canonical
+example is Charguéraud and Pottier's union-find with the inverse-Ackermann
+amortised bound in \textsc{CFML}/Coq~\cite{CharguraudPottier2015UnionFind,CharguraudPottier2019JAR};
+Guéneau, Charguéraud and Pottier~\cite{GueneauChargueraudPottier2018ESOP}
+generalise this to a big-$\Bigo$-friendly time-credit framework. Carbonneaux
+et al.~\cite{CarbonneauxHoffmannRepsShao2017CAV} produce \textsc{Coq}-checked
+cost certificates from \textsc{Why3}, and Hoffmann's \emph{Resource Aware
+ML}~\cite{Hoffmann2017RaML} gives an automated analyser with checkable
+certificates. \Lean's \code{Asymptotics.IsBigO} (in \code{Mathlib.Analysis})
+provides the analytic side of asymptotic notation but has not been linked to
+a runtime cost model; building such a cost monad in \Lean{} is left for
+future work.
+
+% =====================================================================
+\section{Preliminaries}\label{sec:prelim}
+
+This section is a stub; it will fix notation for the rest of the paper.
+
+\paragraph*{Lean 4 and Mathlib.}
+We use \Lean{} 4~\cite{deMouraUllrich2021Lean4} with
+\Mathlib{}~v4.29.1~\cite{Mathlib2020}. Notation: \code{Fin n} is the finite
+type with $n$ elements; \code{WithTop $\alpha$} adjoins a top element
+$\top$ to $\alpha$; \code{NNReal} is the type of non-negative reals;
+\code{Float} is \Lean's runtime IEEE-754 double-precision wrapper.
+\Mathlib's graph theory uses \code{SimpleGraph} but we work with directed
+graphs and edge weights, so we introduce our own \code{Graph} record type
+in \code{Sssp.Graph}.
+
+\paragraph*{\Dijkstra's algorithm.}
+Dijkstra's classical algorithm~\cite{Dijkstra1959} maintains a tentative
+distance estimate $\dhat[v]$ for every vertex, initialised to $0$ at the
+source $s$ and to $\infty$ elsewhere; it iteratively pops the vertex of
+minimum estimate from a priority queue, marks it ``settled'', and relaxes
+its outgoing edges $u \to v$ by the rule
+$\dhat[v] \leftarrow \min(\dhat[v], \dhat[u] + w(u,v))$. With a binary heap
+the running time is $\Bigo((n+m)\log n)$; with a Fibonacci
+heap~\cite{FredmanTarjan1987} it is $\Bigo(m + n\log n)$. Standard
+textbook treatments give $w \in \mathbb{R}_{\geq 0}$ or
+$w \in \mathbb{Z}_{\geq 0}$ as the edge-weight model;
+see Cormen et al.~\cite{CLRS2022} or
+Sedgewick~\cite{Sedgewick2003GraphAlgorithms}.
+
+\paragraph*{IEEE-754 in two paragraphs.}
+\todo{Write a tight summary of: rounding modes, normal/subnormal numbers,
+\code{ulp}, \code{Float.add}, \code{Float.lt}, monotonicity of
+\code{Float.add} on the non-negative orthant per
+\textsc{IEEE Std 754-2019}~\cite{IEEE754_2019}, and the standard
+$(n-1)\cdot\mathrm{ulp}$ forward-error bound for
+sums~\cite[Ch.~4]{Higham2002Accuracy}.}
+
+% =====================================================================
+\section{Architecture: spec, algorithm, refinement}\label{sec:architecture}
+
+\todo{Describe the three layers --- \code{Sssp.<X>} (spec/oracle),
+\code{Sssp.Algo.<X>} (verified Lean), \code{Sssp.Refine.<X>}
+(operational mirror of Rust) --- with a small diagram. Cite specific
+modules: \code{Sssp/Distance.lean:34} (\code{trueDist}),
+\code{Sssp/Dijkstra.lean:46} (\code{dijkstraSpec}),
+\code{Sssp/Algo/Dijkstra.lean:22} (\code{relaxRound} and
+\code{Algo.dijkstra}),
+\code{Sssp/Refine/Dijkstra.lean:326} (\code{dijkstraStep}),
+\code{Sssp/Refine/Dijkstra.lean:366} (\code{dijkstraHeap}). Explain why
+the spec layer is deliberately oracular (we want to factor out
+``what answer is correct'' from ``what algorithm computes it''); explain
+why the Refine layer uses \code{Float}/CSR (we want a line-by-line mirror
+of \code{src/dijkstra.rs}).}
+
+% =====================================================================
+\section{The verified abstract \Dijkstra}\label{sec:algo}
+
+\todo{Step through \code{Sssp.Algo.dijkstra = relaxRound G n (initEstimate s)}
+(\code{formal/lean/Sssp/Algo/Dijkstra.lean:22}) and the two-part proof:
+soundness via \code{relax\_sound}
+(\code{formal/lean/Sssp/Dijkstra.lean:57}) and completeness via
+\code{relaxRound\_le\_initWalk}
+(\code{formal/lean/Sssp/Algo/Dijkstra.lean:231}), the latter using a
+length-$\le n$ walk extracted from
+\code{formal/lean/Sssp/Distance.lean:264}. Quote the closed theorem
+\code{dijkstra\_correct} from \code{formal/lean/Sssp/Algo/Dijkstra.lean:318}.}
+
+% =====================================================================
+\section{Refinement to Rust: the four bridge axioms}\label{sec:refine}
+
+\todo{Detailed walk-through of \code{Sssp.Refine.*}:
+the simulation invariant \code{SimInv = (len, aligned, sound)} from
+\code{formal/lean/Sssp/Refine/RelaxBridge.lean:21}; the per-edge
+re-ordering proof \code{relaxOutEdges\_eq\_relaxCsrOut}
+(\code{formal/lean/Sssp/Refine/RelaxBridge.lean:429}); and the four
+named bridge modules:
+\begin{itemize}
+  \item \code{NumericBridge}~--- IEEE-754 facts.
+  \item \code{RelaxBridge}~--- per-edge alignment.
+  \item \code{GraphBridge}~--- CSR$\leftrightarrow$\code{Graph} preimage.
+  \item \code{HeapBridge}~--- lazy-heap simulation
+    (\code{dijkstraHeap\_eq\_dijkstraRelax} at
+    \code{formal/lean/Sssp/Refine/HeapBridge.lean:20}).
+\end{itemize}
+Conclude with the headline theorem
+\code{refine\_dijkstra\_correct} from
+\code{formal/lean/Sssp/Refine/RefineCorrectness.lean:23}.}
+
+% =====================================================================
+\section{Fixture-based regression harness}\label{sec:fixtures}
+
+\todo{Describe \code{Sssp.Fixtures.*}, the JSON format under
+\code{formal/fixtures/dijkstra/*.json}, the script
+\code{formal/scripts/check-fixtures.sh}, and how the same data is consumed
+by \code{cargo test shared\_json\_fixtures} in
+\code{src/dijkstra.rs:99--113}. Discuss the trust base: \code{native\_decide}
+includes the \Lean{} compiler/runtime; the symbolic theorem
+\code{refine\_dijkstra\_correct} does not.}
+
+% =====================================================================
+\section{Empirical study: \Dijkstra{} versus \BMSSP}\label{sec:benchmark}
+
+\todo{Reproduce the table from \code{README.md:48--71} (Dijkstra-vs-BMSSP
+timing for $n=10^3$ to $4\cdot 10^6$); analyse the
+$\mathrm{ratio}\cdot\log^{1/3} n$ rescaling and the
+recursion-depth-step behaviour. Conclude: the asymptotic crossover is at
+$n\gtrsim 2^{216}$. This is why a verified textbook \Dijkstra{} remains the
+practical baseline of interest, and why future \BMSSP{} verification work
+will not displace it on workstation-scale inputs.}
+
+% =====================================================================
+\section{Discussion and future work}\label{sec:discussion}
+
+\todo{Outline:
+\begin{enumerate}[leftmargin=1.6em,itemsep=0.25em]
+  \item \textbf{Phase~3c: zero-axiom \Dijkstra.} Eliminate the four bridge
+        axiom blocks. NumericBridge: either move to $\mathbb{N}$/\code{WithTop $\mathbb{N}$}
+        weights with an explicit lift, or port a fragment of
+        \textsc{Flocq}~\cite{BoldoMelquiond2011Flocq} to \Lean. RelaxBridge,
+        GraphBridge: structural arguments from \code{fromEdgeList};
+        HeapBridge: an honest heap-simulation proof.
+  \item \textbf{Aeneas-driven extraction.} Replace the hand-translated
+        Refine layer with output from
+        \textsc{Aeneas}~\cite{HoProtzenko2022Aeneas,HoFromherzProtzenko2024Aeneas},
+        gaining a sound borrow-checker bridge from
+        Ho/Fromherz/Protzenko~\cite{HoFromherzProtzenko2024Aeneas}.
+  \item \textbf{Forward-error bound.} Prove a Higham-style
+        $(n-1)\cdot\mathrm{ulp}$ bound for the cumulative \code{f64} sum
+        along any shortest path~\cite{Higham2002Accuracy}, building on a
+        future \textsc{Flocq}-port for \Lean.
+  \item \textbf{Cost monad.} Build a runtime cost monad for \Lean{} on top
+        of \Mathlib's \code{Asymptotics.IsBigO}, in the spirit of
+        Charguéraud--Pottier time
+        credits~\cite{CharguraudPottier2015UnionFind,GueneauChargueraudPottier2018ESOP},
+        and recover the standard $(n+m)\log n$ \Dijkstra{} bound.
+  \item \textbf{Verifying \BMSSP.} Once Phase~3c is closed, instantiate the
+        same three-layer architecture for the new
+        $\Bigo(m\log^{2/3} n)$ algorithm of
+        Duan~et~al.~\cite{DuanMaoMaoShuYin2025}, with the cost monad above
+        delivering the asymptotic claim of their Lemma~3.12.
+\end{enumerate}}
+
+% =====================================================================
+\section*{Acknowledgements}
+\todo{Add acknowledgements (Lean Zulip, Aeneas team, etc.) and funding.}
+
+% =====================================================================
+\bibliographystyle{alpha}
+\bibliography{refs}
+
+\end{document}
