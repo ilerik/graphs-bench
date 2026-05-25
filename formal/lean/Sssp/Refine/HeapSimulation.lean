@@ -10,7 +10,7 @@ import Sssp.Refine.Simulation
 namespace Sssp
 namespace Refine
 
-open Sssp Algo FloatNat
+open Sssp Algo FloatNat List
 
 variable {n : ℕ} {g : RustGraph}
 
@@ -146,6 +146,87 @@ theorem dijkstraStep_fresh_dist {vg : ValidRustGraph n g} (dist : List Float) (h
   rw [dijkstraStep_fresh (g := g) dist heap item rest hpop hfresh]
   exact outEdges_foldl_fst_eq_floatRelaxOut (vg := vg) dist item rest u hitemv hitem
 
+/-! ### Heap state invariant -/
+
+/-- Every heap entry carries a distance at least the current `dist` at its vertex. -/
+structure HeapStateInv {g : RustGraph} (vg : ValidRustGraph n g)
+    (dist : List Float) (heap : List HeapItem) : Prop where
+  le : ∀ item ∈ heap, dist[item.v]! ≤ item.d
+  valid : ∀ item ∈ heap, item.v < n
+
+private def heapFoldMinPick (acc it : HeapItem) : HeapItem :=
+  if it.d < acc.d || (it.d == acc.d && it.v < acc.v) then it else acc
+
+private theorem mem_cons_middle {x y a : HeapItem} {xs : List HeapItem}
+    (h : a ∈ x :: xs) : a ∈ x :: y :: xs := by
+  simp [List.mem_cons] at h ⊢
+  tauto
+
+private theorem heapFoldMinPick_eq :
+    (fun acc it => if it.d < acc.d || (it.d == acc.d && it.v < acc.v) then it else acc) =
+      heapFoldMinPick := rfl
+
+private theorem foldl_heapPopMin_mem (x : HeapItem) :
+    ∀ xs, List.foldl heapFoldMinPick x xs ∈ x :: xs := by
+  intro xs
+  induction xs generalizing x with
+  | nil => exact Mem.head []
+  | cons y xs ih =>
+    simp only [List.foldl_cons, heapFoldMinPick]
+    split
+    · exact mem_cons_of_mem x (ih y)
+    · exact mem_cons_middle (ih x)
+
+theorem heapPopMin_some_mem {heap : List HeapItem} {item rest}
+    (h : heapPopMin heap = some (item, rest)) : item ∈ heap := by
+  unfold heapPopMin at h
+  match heap with
+  | [] => cases h
+  | x :: xs =>
+    simp only at h
+    cases h
+    have hself : heapFoldMinPick x x = x := by
+      unfold heapFoldMinPick
+      split_ifs <;> simp
+    have hfold :
+        List.foldl (fun acc it => if it.d < acc.d || (it.d == acc.d && it.v < acc.v) then it else acc) x
+            (x :: xs) =
+          List.foldl heapFoldMinPick x xs := by
+      rw [heapFoldMinPick_eq, List.foldl, hself]
+    rw [hfold]
+    exact foldl_heapPopMin_mem x xs
+
+private theorem freshPop_dist_le (dist : List Float) (item : HeapItem)
+    (hfresh : distStale dist item = false) : item.d ≤ dist[item.v]! := by
+  have hnot : ¬ dist[item.v]! < item.d := by
+    intro hlt
+    have htrue : distStale dist item = true := by
+      unfold distStale
+      rw [List.getElem!_eq_getElem?_getD (l := dist)] at hlt ⊢
+      exact decide_eq_true (gt_iff_lt.mpr hlt)
+    exact Bool.eq_false_iff.mp hfresh htrue
+  exact float_le_of_not_lt hnot
+
+private theorem freshPop_dist_eq {dist : List Float} {item : HeapItem}
+    (hle : dist[item.v]! ≤ item.d) (hfresh : distStale dist item = false) :
+    item.d = dist[item.v]! :=
+  float_le_antisymm (freshPop_dist_le dist item hfresh) hle
+
+theorem heapStateInv_init {vg : ValidRustGraph n g} (s : Fin n) :
+    HeapStateInv (vg := vg) (initDist g s.val) [⟨0.0, s.val⟩] where
+  le := by
+    intro item hmem
+    simp [List.mem_singleton] at hmem
+    subst hmem
+    have hget := initDist_get (vg := vg) s s
+    simp [hget, beq_self_eq_true]
+    exact float_le_refl 0.0
+  valid := by
+    intro item hmem
+    simp [List.mem_singleton] at hmem
+    subst hmem
+    exact s.isLt
+
 /-! ### `SimInv` through one fresh heap step -/
 
 theorem floatRelaxOut_simInv {vg : ValidRustGraph n g} (s : Fin n) (dist : List Float)
@@ -159,9 +240,9 @@ theorem dijkstraStep_simInv_fresh {vg : ValidRustGraph n g} (s : Fin n) (dist : 
     (dHat : DistEstimate n) (heap : List HeapItem) (item : HeapItem) (rest : List HeapItem)
     (u : Fin n) (hpop : heapPopMin heap = some (item, rest))
     (hfresh : distStale dist item = false) (_hitemv : item.v = u.val)
-    (hitemd : item.d = dist[u.val]!) (h : SimInv vg s dist dHat) :
+    (hle : dist[item.v]! ≤ item.d) (h : SimInv vg s dist dHat) :
     SimInv vg s (dijkstraStep g dist heap).1 (relaxOutEdges vg.toGraph dHat u) := by
-  have hitem := show item.d = dist[item.v]! from by rw [_hitemv]; exact hitemd
+  have hitem := freshPop_dist_eq hle hfresh
   rw [dijkstraStep_fresh_dist (vg := vg) dist heap item rest u _hitemv hpop hfresh hitem]
   suffices hsim : SimInv vg s (floatRelaxOut g dist u.val) (relaxOutEdges vg.toGraph dHat u) from
     show SimInv vg s (floatRelaxOut g dist item.v) (relaxOutEdges vg.toGraph dHat u) from
@@ -175,6 +256,30 @@ theorem dijkstraStep_simInv_stale {vg : ValidRustGraph n g} (s : Fin n) (dist : 
     SimInv vg s (dijkstraStep g dist heap).1 dHat := by
   rw [dijkstraStep_stale_dist dist heap item rest hpop hstale]
   exact h
+
+theorem dijkstraStep_preserves_simInv {vg : ValidRustGraph n g} (s : Fin n) (dist : List Float)
+    (dHat : DistEstimate n) (heap : List HeapItem) (h : SimInv vg s dist dHat)
+    (hHeap : HeapStateInv (vg := vg) dist heap) :
+    ∃ dHat', SimInv vg s (dijkstraStep g dist heap).1 dHat' := by
+  by_cases hpop : heapPopMin heap = none
+  · rw [dijkstraStep_none dist heap hpop]
+    exact ⟨dHat, h⟩
+  · obtain ⟨item, rest, hpop'⟩ : ∃ item rest, heapPopMin heap = some (item, rest) := by
+      cases h : heapPopMin heap with
+      | none => exact absurd h hpop
+      | some p => exact ⟨p.1, p.2, rfl⟩
+    cases hstale : distStale dist item with
+    | false =>
+      have hpop : heapPopMin heap = some (item, rest) := hpop'
+      have hmem := heapPopMin_some_mem hpop
+      let u : Fin n := ⟨item.v, vg.hn ▸ hHeap.valid item hmem⟩
+      have hitemv : item.v = u.val := rfl
+      exact ⟨relaxOutEdges vg.toGraph dHat u,
+        dijkstraStep_simInv_fresh (vg := vg) s dist dHat heap item rest u hpop hstale hitemv
+          (hHeap.le item hmem) h⟩
+    | true =>
+      have hpop : heapPopMin heap = some (item, rest) := hpop'
+      exact ⟨dHat, dijkstraStep_simInv_stale (vg := vg) s dist dHat heap item rest hpop hstale h⟩
 
 end Refine
 end Sssp
