@@ -151,8 +151,23 @@ theorem dijkstraStep_fresh_dist {vg : ValidRustGraph n g} (dist : List Float) (h
 /-- Every heap entry carries a distance at least the current `dist` at its vertex. -/
 structure HeapStateInv {g : RustGraph} (vg : ValidRustGraph n g)
     (dist : List Float) (heap : List HeapItem) : Prop where
+  dist_len : dist.length = g.n
   le : ∀ item ∈ heap, dist[item.v]! ≤ item.d
   valid : ∀ item ∈ heap, item.v < n
+
+theorem heapPopMin_rest_mem {heap : List HeapItem} {item : HeapItem} {rest : List HeapItem}
+    {it : HeapItem} (h : heapPopMin heap = some (item, rest)) (hmem : it ∈ rest) :
+    it ∈ heap := by
+  unfold heapPopMin at h
+  match heap with
+  | [] => cases h
+  | x :: xs =>
+    simp only at h
+    cases h
+    simp [List.mem_filter] at hmem
+    rcases hmem.1 with rfl | h
+    · exact Mem.head xs
+    · exact mem_cons_of_mem x h
 
 private def heapFoldMinPick (acc it : HeapItem) : HeapItem :=
   if it.d < acc.d || (it.d == acc.d && it.v < acc.v) then it else acc
@@ -214,18 +229,165 @@ private theorem freshPop_dist_eq {dist : List Float} {item : HeapItem}
 
 theorem heapStateInv_init {vg : ValidRustGraph n g} (s : Fin n) :
     HeapStateInv (vg := vg) (initDist g s.val) [⟨0.0, s.val⟩] where
+  dist_len := by simp [initDist_length, vg.hn]
   le := by
     intro item hmem
-    simp [List.mem_singleton] at hmem
+    simp at hmem
     subst hmem
     have hget := initDist_get (vg := vg) s s
     simp [hget, beq_self_eq_true]
     exact float_le_refl 0.0
   valid := by
     intro item hmem
-    simp [List.mem_singleton] at hmem
+    simp at hmem
     subst hmem
     exact s.isLt
+
+/-! ### Heap invariant through relax fold -/
+
+private theorem mem_heapRelaxFoldl {item : HeapItem} (es : List (Nat × Float))
+    (dist : List Float) (rest : List HeapItem) {h : HeapItem} (hmem : h ∈ rest) :
+    h ∈ (es.foldl
+      (fun (d, h') (tgt, w) =>
+        let nd := item.d + w
+        if nd < d[tgt]! then (d.set tgt nd, heapPush h' ⟨nd, tgt⟩) else (d, h'))
+      (dist, rest)).2 := by
+  induction es generalizing dist rest with
+  | nil => simpa using hmem
+  | cons p es ih =>
+    simp only [List.foldl_cons]
+    split_ifs
+    · have hmem' : h ∈ heapPush rest ⟨item.d + p.2, p.1⟩ := Mem.tail _ hmem
+      exact ih (dist := dist.set p.1 (item.d + p.2))
+        (rest := heapPush rest ⟨item.d + p.2, p.1⟩) hmem'
+    · exact ih (dist := dist) (rest := rest) hmem
+
+private def heapRelaxStep (item : HeapItem) (acc : List Float × List HeapItem) (p : Nat × Float) :
+    List Float × List HeapItem :=
+  let nd := item.d + p.2
+  if nd < acc.1[p.1]! then (acc.1.set p.1 nd, heapPush acc.2 ⟨nd, p.1⟩) else acc
+
+private theorem heapRelaxEs_preserves_heapInv {vg : ValidRustGraph n g}
+    (es : List (Nat × Float)) (dist : List Float) (item : HeapItem)
+    (rest : List HeapItem) (u : Fin n) (hitemv : item.v = u.val)
+    (hitem : item.d = dist[item.v]!) (hHeap : HeapStateInv (vg := vg) dist rest)
+    (hsub : ∀ p ∈ es, p ∈ g.outEdges item.v) :
+    HeapStateInv (vg := vg)
+      (es.foldl (fun acc p => heapRelaxStep item acc p) (dist, rest)).1
+      (es.foldl (fun acc p => heapRelaxStep item acc p) (dist, rest)).2 := by
+  induction es generalizing dist rest with
+  | nil => exact hHeap
+  | cons p es ih =>
+    have hp : p ∈ g.outEdges item.v := hsub p List.mem_cons_self
+    have hp_u : p ∈ g.outEdges u.val := hitemv ▸ hp
+    have htgt' : p.1 < g.n := vg.hn ▸ vg.htgt u p hp_u
+    have hns' : p.1 ≠ item.v := by
+      intro heq
+      rw [List.mem_iff_getElem] at hp_u
+      obtain ⟨i, hi, hf⟩ := hp_u
+      exact vg.hns u i hi ((congrArg Prod.fst hf).trans (heq.trans hitemv))
+    have hkeep : dist[item.v]! = (dist.set p.1 (item.d + p.2))[item.v]! := by
+      rw [List.getElem!_eq_getElem?_getD (l := dist), List.getElem!_eq_getElem?_getD
+        (l := dist.set p.1 (item.d + p.2)), List.getElem?_set]
+      simp [if_neg hns']
+    have hitem' : item.d = (dist.set p.1 (item.d + p.2))[item.v]! := hitem.trans hkeep
+    simp only [List.foldl_cons, heapRelaxStep]
+    split_ifs with hlt
+    · refine ih (dist := dist.set p.1 (item.d + p.2)) (rest := heapPush rest ⟨item.d + p.2, p.1⟩)
+        hitem' ?_ (fun q hq => hsub q (Mem.tail _ hq))
+      refine HeapStateInv.mk (by rw [List.length_set, hHeap.dist_len]) ?_ ?_
+      · intro it hmem
+        rw [heapPush, List.mem_cons] at hmem
+        rcases hmem with heq | hmem
+        · cases heq
+          rw [List.getElem!_eq_getElem?_getD, List.getElem?_set]
+          simp [hHeap.dist_len, htgt']
+          exact float_le_refl _
+        · have hle := hHeap.le it hmem
+          have hi : it.v < g.n := vg.hn ▸ hHeap.valid it hmem
+          by_cases heq : it.v = p.1
+          · have hget : (dist.set p.1 (item.d + p.2))[it.v]! = item.d + p.2 := by
+              rw [heq, List.getElem!_eq_getElem?_getD, List.getElem?_set]
+              simp [htgt', hHeap.dist_len]
+            have hle' : dist[p.1]! ≤ it.d := by rw [← heq]; exact hle
+            rw [hget]
+            exact float_le_trans (float_le_of_lt hlt) hle'
+          · have hget : (dist.set p.1 (item.d + p.2))[it.v]! = dist[it.v]! := by
+              rw [List.getElem!_eq_getElem?_getD, List.getElem?_set, if_neg (Ne.symm heq)]
+              simp [hi, hHeap.dist_len]
+            rw [hget]
+            exact hle
+      · intro it hmem
+        rw [heapPush, List.mem_cons] at hmem
+        rcases hmem with heq | hmem
+        · cases heq; exact vg.hn ▸ htgt'
+        · exact hHeap.valid it hmem
+    · exact ih (dist := dist) (rest := rest) hitem hHeap (fun q hq => hsub q (Mem.tail _ hq))
+
+private theorem heapRelaxEdges_preserves_heapInv {vg : ValidRustGraph n g}
+    (edges : List (Nat × Float)) (dist : List Float) (item : HeapItem)
+    (rest : List HeapItem) (u : Fin n) (hitemv : item.v = u.val)
+    (hitem : item.d = dist[item.v]!) (hHeap : HeapStateInv (vg := vg) dist rest)
+    (hedges : edges = g.outEdges item.v) :
+    HeapStateInv (vg := vg)
+      (edges.foldl (fun acc p => heapRelaxStep item acc p) (dist, rest)).1
+      (edges.foldl (fun acc p => heapRelaxStep item acc p) (dist, rest)).2 := by
+  subst hedges
+  exact heapRelaxEs_preserves_heapInv (vg := vg) (g.outEdges item.v) dist item rest u hitemv hitem
+    hHeap (fun _ hp => hp)
+
+private theorem heapRelaxFoldl_preserves_heapInv {vg : ValidRustGraph n g}
+    (dist : List Float) (item : HeapItem) (rest : List HeapItem) (u : Fin n)
+    (hitemv : item.v = u.val) (hitem : item.d = dist[item.v]!)
+    (hHeap : HeapStateInv (vg := vg) dist rest) :
+    HeapStateInv (vg := vg)
+      ((g.outEdges item.v).foldl
+        (fun (d, h) (tgt, w) =>
+          let nd := item.d + w
+          if nd < d[tgt]! then (d.set tgt nd, heapPush h ⟨nd, tgt⟩) else (d, h))
+        (dist, rest)).1
+      ((g.outEdges item.v).foldl
+        (fun (d, h) (tgt, w) =>
+          let nd := item.d + w
+          if nd < d[tgt]! then (d.set tgt nd, heapPush h ⟨nd, tgt⟩) else (d, h))
+        (dist, rest)).2 := by
+  have hEq : (fun (d, h) (tgt, w) =>
+      let nd := item.d + w
+      if nd < d[tgt]! then (d.set tgt nd, heapPush h ⟨nd, tgt⟩) else (d, h)) =
+    fun acc p => heapRelaxStep item acc p := by
+    funext acc p; cases acc with | mk d h => cases p with | mk tgt w => rfl
+  rw [hEq]
+  exact heapRelaxEdges_preserves_heapInv (vg := vg) (g.outEdges item.v) dist item rest u
+    hitemv hitem hHeap rfl
+
+theorem dijkstraStep_preserves_heapInv {vg : ValidRustGraph n g} (dist : List Float)
+    (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) :
+    HeapStateInv (vg := vg) (dijkstraStep g dist heap).1 (dijkstraStep g dist heap).2 := by
+  by_cases hnone : heapPopMin heap = none
+  · rw [dijkstraStep_none dist heap hnone]
+    exact hHeap
+  · obtain ⟨item, rest, hpop⟩ : ∃ item rest, heapPopMin heap = some (item, rest) := by
+      cases h : heapPopMin heap with
+      | none => exact absurd h hnone
+      | some p => exact ⟨p.1, p.2, rfl⟩
+    cases hstale : distStale dist item with
+    | true =>
+      rw [dijkstraStep_stale (g := g) dist heap item rest hpop hstale]
+      exact {
+        dist_len := hHeap.dist_len
+        le := fun it hmem => hHeap.le it (heapPopMin_rest_mem hpop hmem)
+        valid := fun it hmem => hHeap.valid it (heapPopMin_rest_mem hpop hmem) }
+    | false =>
+      have hmem := heapPopMin_some_mem hpop
+      let u : Fin n := ⟨item.v, vg.hn ▸ hHeap.valid item hmem⟩
+      have hitemv : item.v = u.val := rfl
+      have hitem := freshPop_dist_eq (hHeap.le item hmem) hstale
+      have hHeap' : HeapStateInv (vg := vg) dist rest := {
+        dist_len := hHeap.dist_len
+        le := fun it hmem => hHeap.le it (heapPopMin_rest_mem hpop hmem)
+        valid := fun it hmem => hHeap.valid it (heapPopMin_rest_mem hpop hmem) }
+      rw [dijkstraStep_fresh (g := g) dist heap item rest hpop hstale]
+      exact heapRelaxFoldl_preserves_heapInv (vg := vg) dist item rest u hitemv hitem hHeap'
 
 /-! ### `SimInv` through one fresh heap step -/
 
@@ -280,6 +442,40 @@ theorem dijkstraStep_preserves_simInv {vg : ValidRustGraph n g} (s : Fin n) (dis
     | true =>
       have hpop : heapPopMin heap = some (item, rest) := hpop'
       exact ⟨dHat, dijkstraStep_simInv_stale (vg := vg) s dist dHat heap item rest hpop hstale h⟩
+
+theorem dijkstraRun_preserves_simInv {vg : ValidRustGraph n g} (s : Fin n) (fuel : Nat)
+    (dist : List Float) (dHat : DistEstimate n) (heap : List HeapItem)
+    (h : SimInv vg s dist dHat) (hHeap : HeapStateInv (vg := vg) dist heap) :
+    ∃ dHat', SimInv vg s (dijkstraRun fuel g dist heap).1 dHat' := by
+  induction fuel generalizing dist dHat heap h hHeap with
+  | zero =>
+    rw [dijkstraRun_zero]
+    exact ⟨dHat, h⟩
+  | succ fuel ih =>
+    rw [dijkstraRun_succ]
+    obtain ⟨dHat', hSim'⟩ := dijkstraStep_preserves_simInv (vg := vg) s dist dHat heap h hHeap
+    have hHeap' := dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap
+    exact ih (dijkstraStep g dist heap).1 dHat' (dijkstraStep g dist heap).2 hSim' hHeap'
+
+theorem dijkstraInit_simInv {vg : ValidRustGraph n g} (s : Fin n) :
+    SimInv vg s (initDist g s.val) (initEstimate s) ∧
+    HeapStateInv (vg := vg) (initDist g s.val) [⟨0.0, s.val⟩] :=
+  ⟨initSimInv (vg := vg) s, heapStateInv_init (vg := vg) s⟩
+
+def dijkstraHeapFuel (g : RustGraph) : Nat :=
+  g.n * g.edgeTo.length + g.n + 1
+
+theorem dijkstraHeap_eq_dijkstraRun (source : Nat) :
+    dijkstraHeap g source =
+      (dijkstraRun (dijkstraHeapFuel g) g (initDist g source) [⟨0.0, source⟩]).1 := by
+  unfold dijkstraHeap dijkstraHeapFuel
+  rfl
+
+theorem dijkstraRun_init_simInv {vg : ValidRustGraph n g} (s : Fin n) (fuel : Nat) :
+    ∃ dHat, SimInv vg s (dijkstraRun fuel g (initDist g s.val) [⟨0.0, s.val⟩]).1 dHat := by
+  obtain ⟨hSim, hHeap⟩ := dijkstraInit_simInv (vg := vg) s
+  exact dijkstraRun_preserves_simInv (vg := vg) s fuel (initDist g s.val) (initEstimate s)
+    [⟨0.0, s.val⟩] hSim hHeap
 
 end Refine
 end Sssp
