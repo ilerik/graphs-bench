@@ -102,5 +102,37 @@ theorem dijkstraRelax_dist_eq_nnreal (vg : ValidRustGraph n g) (s v : Fin n) :
   exact (floatRelaxRound_simInv (vg := vg) s n (initDist g s.val) (initEstimate s)
     (initSimInv (vg := vg) s)).aligned v
 
+/-- Two distance lists carrying the same `SimInv` estimate agree pointwise, hence as lists. -/
+private theorem simInv_get_eq {vg : ValidRustGraph n g} {s : Fin n}
+    {d1 d2 : List Float} {dHat : DistEstimate n}
+    (h1 : SimInv vg s d1 dHat) (h2 : SimInv vg s d2 dHat) (v : Fin n) :
+    d1[v.val]! = d2[v.val]! := by
+  rw [h1.aligned v, h2.aligned v]
+
+private theorem getElem_eq_getElem! {l : List Float} {i : Nat} (hi : i < l.length) :
+    l[i]'hi = l[i]! := by
+  rw [List.getElem!_eq_getElem?_getD, List.getElem?_eq_getElem hi, Option.getD_some]
+
+private theorem getElem_eq_of_getElem! {l1 l2 : List Float} {i : Nat} (hi : i < l1.length)
+    (hlen : l1.length = l2.length) (h : l1[i]! = l2[i]!) :
+    l1[i]'hi = l2[i]'(hlen ▸ hi) :=
+  (getElem_eq_getElem! hi).trans (h.trans (getElem_eq_getElem! (hlen ▸ hi)).symm)
+
+theorem simInv_dist_eq {vg : ValidRustGraph n g} {s : Fin n}
+    {d1 d2 : List Float} {dHat : DistEstimate n}
+    (h1 : SimInv vg s d1 dHat) (h2 : SimInv vg s d2 dHat) :
+    d1 = d2 := by
+  refine List.ext_getElem (by rw [h1.len, h2.len]) fun i hi _ => by
+    have hi' : i < n := lt_of_lt_of_eq hi h1.len
+    exact getElem_eq_of_getElem! hi (h1.len.trans h2.len.symm)
+      (simInv_get_eq (vg := vg) (s := s) h1 h2 ⟨i, hi'⟩)
+
+theorem dist_eq_of_simInv_dHat_eq {vg : ValidRustGraph n g} {s : Fin n}
+    {d1 d2 : List Float} {dHat1 dHat2 : DistEstimate n}
+    (heq : dHat1 = dHat2) (h1 : SimInv vg s d1 dHat1) (h2 : SimInv vg s d2 dHat2) :
+    d1 = d2 := by
+  subst heq
+  exact simInv_dist_eq h1 h2
+
 end Refine
 end Sssp

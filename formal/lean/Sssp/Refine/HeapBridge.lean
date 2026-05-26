@@ -2,11 +2,11 @@
   Sssp.Refine.HeapBridge
 
   Connect lazy-heap `dijkstraHeap` to `dijkstraRelax` (Phase 3b heap step).
-  Full simulation is future work; correctness on `ValidRustGraph` is trusted
-  here and regression-checked on fixtures via `native_decide`.
+  Per-step simulation is in `HeapSimulation`; the remaining obligation is
+  `dijkstraHeap_eq_dijkstraRelax_of_schedule` (heap fuel schedule = `n` relax rounds).
 -/
 
-import Sssp.Refine.Simulation
+import Sssp.Refine.HeapSimulation
 
 namespace Sssp
 namespace Refine
@@ -16,7 +16,10 @@ open Sssp Fixtures
 variable {n : ℕ} {g : RustGraph}
 
 /-- Lazy-heap Dijkstra agrees with the proof-relevant relaxation model on valid
-    CSR graphs (nat weights, out-degree ≤ 2). Fixture vectors checked below. -/
+    CSR graphs (nat weights, out-degree ≤ 2). Fixture vectors checked below.
+
+    Proof route: `dijkstraHeap_eq_dijkstraRun` + `simInv_dist_eq` once heap fuel
+    schedule matches `relaxRound g.n (initEstimate s)` (see `HeapSimulation`). -/
 axiom dijkstraHeap_eq_dijkstraRelax (vg : ValidRustGraph n g) (source : Nat) :
     dijkstraHeap g source = dijkstraRelax g source
 
