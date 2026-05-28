@@ -696,19 +696,78 @@ listed and discussed in \cref{sec:refine}.
 % =====================================================================
 \section{Architecture: spec, algorithm, refinement}\label{sec:architecture}
 
-\todo{Describe the three layers --- \code{Sssp.<X>} (spec/oracle),
-\code{Sssp.Algo.<X>} (verified Lean), \code{Sssp.Refine.<X>}
-(operational mirror of Rust) --- with a small diagram. Cite specific
-modules: \code{Sssp/Distance.lean:34} (\code{trueDist}),
-\code{Sssp/Dijkstra.lean:46} (\code{dijkstraSpec}),
-\code{Sssp/Algo/Dijkstra.lean:22} (\code{relaxRound} and
-\code{Algo.dijkstra}),
-\code{Sssp/Refine/Dijkstra.lean:326} (\code{dijkstraStep}),
-\code{Sssp/Refine/Dijkstra.lean:366} (\code{dijkstraHeap}). Explain why
-the spec layer is deliberately oracular (we want to factor out
-``what answer is correct'' from ``what algorithm computes it''); explain
-why the Refine layer uses \code{Float}/CSR (we want a line-by-line mirror
-of \code{src/dijkstra.rs}).}
+The \Lean{} development under \code{formal/lean/Sssp/} is organised in three
+layers. Each layer answers a different question: what is the correct answer,
+what algorithm computes it on abstract graphs, and what executable model
+matches the Rust code.
+
+\paragraph*{Three layers.}
+\begin{itemize}[leftmargin=1.6em,itemsep=0.25em]
+\item \textbf{Spec} (\code{Sssp.<X>})~--- non-computable oracles and metric
+      lemmas. Example: \code{trueDist} at
+      \code{formal/lean/Sssp/Distance.lean:34}; \code{dijkstraSpec} at
+      \code{formal/lean/Sssp/Dijkstra.lean:46}.
+\item \textbf{Algo} (\code{Sssp.Algo.<X>})~--- computable algorithms on
+      \code{Graph n} with \code{NNReal} weights, proved correct against the
+      spec. Example: \code{relaxRound} and \code{Algo.dijkstra} at
+      \code{formal/lean/Sssp/Algo/Dijkstra.lean:22--28}.
+\item \textbf{Refine} (\code{Sssp.Refine.<X>})~--- operational model with
+      \code{Float}, CSR \code{RustGraph}, and lazy heap; mirrors
+      \code{src/dijkstra.rs}. Example: \code{dijkstraStep} at
+      \code{formal/lean/Sssp/Refine/Dijkstra.lean:326},
+      \code{dijkstraHeap} at :366.
+\end{itemize}
+
+\begin{verbatim}
+  Spec (oracle)          Algo (verified)         Refine (executable)
+  ----------------       ----------------        ---------------------
+  trueDist,              relaxRound,             floatRelaxRound,
+  dijkstraSpec           Algo.dijkstra           dijkstraHeap / dijkstra
+         |                      |                         |
+         |    dijkstra_correct  |   Simulation + bridges  |
+         +----------------------+-------------------------+
+                                |
+                         refine_dijkstra_correct
+                                |
+                         src/dijkstra.rs (Rust)
+\end{verbatim}
+
+\paragraph*{Why an oracular spec.}
+The spec layer factors ``what answer is correct'' from ``what algorithm
+computes it''. \code{dijkstraSpec} is defined as \code{trueDist} and
+\code{dijkstraSpec\_correct} holds by \code{rfl}; the real work lives in
+\code{Sssp.Algo.Dijkstra}. This pattern lets future algorithms (e.g.\ a
+verified \BMSSP{}) share the same \code{trueDist} metric without duplicating
+distance theory.
+
+\paragraph*{Why CSR and \code{Float} in Refine.}
+The Refine layer is hand-translated from \code{src/graph.rs} (CSR layout,
+\code{fromEdgeList}) and \code{src/dijkstra.rs} (lazy min-heap, stale-entry
+skip, \code{f64} relax). Using \code{Float} and list-based CSR in \Lean{}
+makes a refinement theorem against Rust structurally feasible; a future
+\textsc{Aeneas} export could replace the hand translation while preserving
+the proof architecture.
+
+\paragraph*{Reading map.}
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\hline
+Lean module & Paper section & Rust source \\
+\hline
+\code{Sssp.Distance} & \cref{sec:prelim}, \cref{sec:algo} & --- \\
+\code{Sssp.Dijkstra} & \cref{sec:algo} & --- \\
+\code{Sssp.Algo.Dijkstra} & \cref{sec:algo} & --- \\
+\code{Sssp.Refine.Dijkstra} & \cref{sec:refine} & \code{src/dijkstra.rs} \\
+\code{Sssp.Refine.RelaxBridge} & \cref{sec:refine} & --- \\
+\code{Sssp.Refine.GraphBridge} & \cref{sec:refine} & \code{src/graph.rs} \\
+\code{Sssp.Refine.NumericBridge} & \cref{sec:refine} & --- \\
+\code{Sssp.Refine.HeapBridge} & \cref{sec:refine} & \code{src/dijkstra.rs} \\
+\code{Sssp.Refine.RefineCorrectness} & \cref{sec:refine} & --- \\
+\code{Sssp.Fixtures.*} & \cref{sec:fixtures} & \code{src/dijkstra.rs} \\
+\hline
+\end{tabular}
+\end{center}
 
 % =====================================================================
 \section{The verified abstract \Dijkstra}\label{sec:algo}
