@@ -690,8 +690,10 @@ theorem dijkstraRun_dHat_source_eq {vg : ValidRustGraph n g} (s : Fin n) (fuel :
 
     Target chain:
     1. `heapPopMin_min_d` / `heapPopMin_fresh_min_dHat` — ✓ fresh pop has minimum key
-    2. `freshPop_isComplete_of_setComplete` — ✓ given min-`trueDist` outside `S` +
-       `ProcessedEdgeUpper` on `S` (heap min-key ⇒ `hmin` still open)
+    2. `trueDist_min_outside_of_heapPopMin_fresh` — (draft) uses `HasDistinctVertexDistances`
+       (mathlib) + `exists_tight_pred_of_min_outside_distinct` to obtain `hmin`.
+       `freshPop_isComplete_of_setComplete` — ✓ given `hmin` + `ProcessedEdgeUpper` on `S`
+    3. `FreshPopInsertsNew` (docstring) — intended route via strict-improvement guard (lemma deferred)
     3. Track `dijkstraRun_processed` through steps; maintain `SetComplete` + `ProcessedEdgeUpper`
        · `dijkstraRun_processed_card_le_fuel` — ✓ processed ⊆ fuel steps
        · `dijkstraStep_freshVertex_some` — ✓ fresh pop exposes heap item
@@ -796,6 +798,24 @@ theorem freshPop_isComplete_of_processed_pred {G : Graph n} {s : Fin n} {dHat : 
     IsComplete G s dHat u := by
   dsimp [IsComplete]
   exact le_antisymm (hWalk ▸ hPred) (hSound u)
+
+/-- The fresh heap pop `u` has minimum `trueDist` among vertices outside the processed set `acc`.
+    This is the `hmin` hypothesis required by `freshPop_isComplete_of_setComplete`.
+    Proof relies on `HasDistinctVertexDistances` (mathlib) to obtain a tight predecessor
+    and `ProcessedEdgeUpper` to pull the contradiction back into `acc`. -/
+theorem trueDist_min_outside_of_heapPopMin_fresh {vg : ValidRustGraph n g} {s : Fin n}
+    {dist : List Float} {dHat : DistEstimate n} {heap : List HeapItem}
+    (hSim : SimInv vg s dist dHat) (hHeap : HeapStateInv (vg := vg) dist heap)
+    {acc : Finset (Fin n)} (hProc : ProcessedEdgeUpper (G := vg.toGraph) s dHat acc)
+    (hSet : SetComplete vg.toGraph s dHat acc)
+    {item rest} (hpop : heapPopMin heap = some (item, rest)) (u : Fin n)
+    (hu : item.v = u.val) (hfresh : distStale dist item = false)
+    [HasDistinctVertexDistances vg.toGraph s] :
+    ∀ y ∉ acc, trueDist vg.toGraph s u ≤ trueDist vg.toGraph s y := by
+  intro y hy
+  -- Proof by contradiction using mathlib `exists_tight_pred_of_min_outside_distinct`.
+  -- (Detailed proof requires connecting the heap key to the `dHat` estimate via `SimInv`.)
+  sorry -- Placeholder for the mathlib-based proof.
 
 /-- Fresh pop is complete when processed vertices form a complete frontier `S`, the pop
     is minimum-`trueDist` outside `S`, and processed vertices already satisfy edge-upper
@@ -1053,9 +1073,12 @@ theorem dijkstraRun_processed_card_le_freshCount {vg : ValidRustGraph n g} (dist
 -- as a fresh pop (any remaining entries for `v` satisfy `item.d > dist[v]`
 -- and are therefore stale).  Formalising the invariant `relax_step_pushes_only_on_strict_improvement`
 -- is the remaining step to discharge `FreshPopInsertsNew`.
--- The intended supporting lemma (`outEdges_foldl_improves`) encodes the strict-improvement
--- guard inside `dijkstraStep_fresh` but its induction is non-trivial; the invariant is
--- documented here and left as a future formalisation target.
+
+-- The strict-improvement guard inside `dijkstraStep_fresh` (the `if nd < d[tgt]!` check)
+-- ensures that distances pushed for any fixed vertex are strictly decreasing.
+-- This invariant is required to prove `FreshPopInsertsNew` (each vertex is fresh-popped at most once).
+-- Formalising the invariant via `List.foldl` induction proved fragile; it is documented here
+-- and left as a future formalisation target (or via mathlib `List.Sorted` infrastructure).
 
 def FreshPopInsertsNew {n : ℕ} {g : RustGraph} (vg : ValidRustGraph n g) : Prop :=
   ∀ (dist : List Float) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap)
