@@ -700,7 +700,8 @@ theorem dijkstraRun_dHat_source_eq {vg : ValidRustGraph n g} (s : Fin n) (fuel :
     4. `dijkstraRun_freshCount_at_heapFuel ≥ n` — reduce via `dijkstraRun_freshCount_ge_n_add_one_of_stale_bound`
        · stale bound `dijkstraRun_staleCount ≤ n * edgeTo.length` still open
        · `dijkstraRun_processed_card_le_freshCount` — ✓ `|processed| ≤ freshCount`
-       · `FreshPopInsertsNew` → `processed.card = freshCount`; with `freshCount ≥ n` → `processed_univ`
+       · `FreshPopInsertsNew` (docstring) — intended route via strict-improvement guard (lemma deferred)
+       · `processed.card = freshCount` (under `FreshPopInsertsNew`) → `processed_univ` at heap fuel
     5. `edgeUpper_of_processedEdgeUpper_univ` — ✓ close from `ProcessedEdgeUpper` + `SetComplete` on univ
     6. Target: `dijkstraRun_dHat_all_complete_at_heapFuel` → `dijkstraRun_dHat_schedule` →
        `dijkstraHeap_eq_dijkstraRelax_of_schedule`
@@ -1044,7 +1045,18 @@ theorem dijkstraRun_processed_card_le_freshCount {vg : ValidRustGraph n g} (dist
   simpa [dijkstraRun_processed] using
     dijkstraRun_processedAcc_card_le_acc_add_freshCount (vg := vg) dist heap hHeap fuel ∅
 
-/-- Each fresh pop extends the processed accumulator (`u` was not already counted). -/
+-- Each fresh pop extends the processed accumulator (`u` was not already counted).
+-- The reason is the relaxation guard `if nd < d[tgt]!`: `dist[v]` is updated
+-- only on strict improvement, so the distances pushed for any fixed `v` are
+-- strictly decreasing.  Consequently at most one entry can ever carry
+-- `d = trueDist v`.  After that entry is popped the vertex never reappears
+-- as a fresh pop (any remaining entries for `v` satisfy `item.d > dist[v]`
+-- and are therefore stale).  Formalising the invariant `relax_step_pushes_only_on_strict_improvement`
+-- is the remaining step to discharge `FreshPopInsertsNew`.
+-- The intended supporting lemma (`outEdges_foldl_improves`) encodes the strict-improvement
+-- guard inside `dijkstraStep_fresh` but its induction is non-trivial; the invariant is
+-- documented here and left as a future formalisation target.
+
 def FreshPopInsertsNew {n : ℕ} {g : RustGraph} (vg : ValidRustGraph n g) : Prop :=
   ∀ (dist : List Float) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap)
     (acc : Finset (Fin n)) (u : Fin n),
