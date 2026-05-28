@@ -669,12 +669,29 @@ see Cormen et al.~\cite{CLRS2022} or
 Sedgewick~\cite{Sedgewick2003GraphAlgorithms}.
 
 \paragraph*{IEEE-754 in two paragraphs.}
-\todo{Write a tight summary of: rounding modes, normal/subnormal numbers,
-\code{ulp}, \code{Float.add}, \code{Float.lt}, monotonicity of
-\code{Float.add} on the non-negative orthant per
-\textsc{IEEE Std 754-2019}~\cite{IEEE754_2019}, and the standard
-$(n-1)\cdot\mathrm{ulp}$ forward-error bound for
-sums~\cite[Ch.~4]{Higham2002Accuracy}.}
+Our Refine layer uses \Lean's runtime \code{Float} type, which wraps
+IEEE-754 binary64 (\code{f64}) arithmetic~\cite{IEEE754_2019,LeanFloat}.
+Arithmetic follows round-to-nearest-even; normal and subnormal values share
+the usual exponent--significand layout, and the unit in the last place
+(ulp) at exponent~$e$ scales as $2^{e-52}$ for doubles.
+We write \code{Float.add}, \code{Float.lt}, and \code{min} for the
+operations the Refine code calls; \code{distInf} in
+\code{Sssp.Refine.Dijkstra} is \code{1.0 / 0.0}, matching Rust's
+\code{f64::INFINITY}.
+
+On the non-negative orthant relevant to nat-cast edge weights
+(\code{floatWeight w = Float.ofNat w}), we rely on monotonicity and
+algebraic laws packaged as named axioms in \code{NumericBridge}
+(\cref{sec:refine}): addition is associative and commutative on the
+operands that arise, and \code{Float.le} is a total preorder compatible
+with \code{Float.lt}.
+We do \emph{not} prove a forward-error bound in this paper; the standard
+Higham-style bound that an $n$-term sum incurs at most
+$(n-1)\cdot\mathrm{ulp}$ rounding error~\cite[Ch.~4]{Higham2002Accuracy}
+is the natural follow-on once a \textsc{Flocq}-style model is available.
+Here we treat IEEE-754 as a first-class specification rather than as a
+derived consequence of \code{BitVec} arithmetic; the relevant axioms are
+listed and discussed in \cref{sec:refine}.
 
 % =====================================================================
 \section{Architecture: spec, algorithm, refinement}\label{sec:architecture}
