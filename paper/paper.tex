@@ -147,13 +147,16 @@ the metric \code{trueDist} valued in \code{WithTop NNReal}; a computable
 \emph{algorithm} layer~\code{Sssp.Algo.Dijkstra} carrying the principal
 correctness theorem~\code{dijkstra\_correct}; and an
 \emph{operational refinement} layer~\code{Sssp.Refine.Dijkstra} that mirrors
-the Rust source line-for-line. The bridge between layers is mediated by four
-named axiom blocks --- \code{NumericBridge}, \code{RelaxBridge},
-\code{GraphBridge}, \code{HeapBridge} --- which document precisely what a
+the Rust source line-for-line. The bridge between layers is mediated by two
+named axiom blocks --- \code{NumericBridge} (21 IEEE-754 facts) and
+\code{HeapBridge} (one lazy-heap simulation axiom, with three conditional
+discharge routes already proved) --- isolating exactly what a
 \Lean{}~$\leftrightarrow$~IEEE-754~$\leftrightarrow$~\textsc{Rust} pipeline
-must currently assume in the absence of a port of \textsc{Flocq} to
-\Lean{}~4. The principal theorem
-\code{refine\_dijkstra\_correct} establishes that, modulo these named axioms,
+must currently assume; \code{RelaxBridge} and \code{GraphBridge} were
+originally axiomatic and have since been fully proved, in the absence of a
+port of \textsc{Flocq} to \Lean{}~4. The principal theorem
+\code{refine\_dijkstra\_correct} establishes that, modulo these two named
+axiom blocks,
 the Rust \Dijkstra{} computes \code{trueDistNat} on every
 \code{ValidRustGraph}; an executable fixture harness shared between Lean
 \code{native\_decide} and \code{cargo} JSON tests provides regression
@@ -298,18 +301,21 @@ development at \code{formal/lean/Sssp/}:
 
 \item \textbf{A bridge-axiom inventory for the Lean--IEEE-754--Rust stack.}
       Where the proof currently relies on assumptions, we name and isolate
-      them in four bridge modules:
+      them in two bridge modules:
       \begin{itemize}[leftmargin=1.2em]
-      \item \code{NumericBridge}~--- IEEE-754 facts about \code{Float}
+      \item \code{NumericBridge}~--- 21 IEEE-754 facts about \code{Float}
             (commutativity, associativity on relevant subdomains,
             monotonicity, behaviour of \code{nnrealToFloat} on
             \code{ofNat}-style inputs);
-      \item \code{RelaxBridge}~--- alignment of the per-edge and per-vertex
-            relaxation loops between the Algo and Refine layers;
-      \item \code{GraphBridge}~--- the CSR$\leftrightarrow$\Mathlib{}
-            \code{SimpleGraph} preimage lemma;
-      \item \code{HeapBridge}~--- the lazy-heap simulation theorem.
+      \item \code{HeapBridge}~--- the lazy-heap simulation axiom
+            \code{dijkstraHeap\_eq\_dijkstraRelax}
+            (\code{formal/lean/Sssp/Refine/HeapBridge.lean:23}), with three
+            conditional discharge routes already proved:
+            \code{dijkstraHeap\_eq\_dijkstraRelax\_of\_upper} (:27),
+            \code{of\_complete} (:43), and \code{of\_edgeUpper} (:55), which
+            reduce the standing axiom to one Dijkstra-completeness lemma.
       \end{itemize}
+      \code{RelaxBridge} and \code{GraphBridge} are fully proved (no axioms).
       An axiom-elimination roadmap (Phase~3c) is laid out in
       \code{formal/FUTURE\_WORK.md}; this paper documents the current
       surface and explains why each axiom is the natural cut-point given
@@ -369,7 +375,9 @@ fixes notation and recalls just enough \Lean, \Mathlib{} and IEEE-754
 background. \Cref{sec:architecture} describes the three-layer architecture
 of the Lean development. \Cref{sec:algo} presents the abstract verified
 \Dijkstra. \Cref{sec:refine} steps through the Refine layer and the
-four bridge axioms. \Cref{sec:fixtures} describes the fixture harness.
+two remaining bridge axiom blocks (with \code{RelaxBridge} and
+\code{GraphBridge} discharged since the initial development).
+\Cref{sec:fixtures} describes the fixture harness.
 \Cref{sec:benchmark} reports the empirical \Dijkstra/\BMSSP{} comparison.
 \Cref{sec:discussion} discusses Phase~3c (zero-axiom \Dijkstra),
 Aeneas-driven extraction, and the path to a verified Higham-style rounding
@@ -597,7 +605,7 @@ specialises directly to a shortest-path of $n-1$ edges, but this has not
 been mechanized for \Dijkstra{} in any system we are aware of. Our paper
 should therefore be read as the necessary first step toward such a
 mechanization in \Lean: it puts in place the architectural scaffolding
-(\code{Algo}, \code{Refine}, the four bridge modules) on top of which a
+(\code{Algo}, \code{Refine}, the two remaining bridge axiom modules) on top of which a
 \textsc{Flocq}-style forward-error theorem becomes natural future work.
 
 \subsection{Refinement, extraction, and cost analysis}\label{sec:rel-cost}
@@ -699,22 +707,27 @@ length-$\le n$ walk extracted from
 \code{dijkstra\_correct} from \code{formal/lean/Sssp/Algo/Dijkstra.lean:318}.}
 
 % =====================================================================
-\section{Refinement to Rust: the four bridge axioms}\label{sec:refine}
+\section{Refinement to Rust: bridge axioms and discharge routes}\label{sec:refine}
 
 \todo{Detailed walk-through of \code{Sssp.Refine.*}:
 the simulation invariant \code{SimInv = (len, aligned, sound)} from
 \code{formal/lean/Sssp/Refine/RelaxBridge.lean:21}; the per-edge
 re-ordering proof \code{relaxOutEdges\_eq\_relaxCsrOut}
-(\code{formal/lean/Sssp/Refine/RelaxBridge.lean:429}); and the four
-named bridge modules:
+(\code{formal/lean/Sssp/Refine/RelaxBridge.lean:429}); and the two
+axiom-bearing bridge modules plus two fully proved bridges:
 \begin{itemize}
-  \item \code{NumericBridge}~--- IEEE-754 facts.
-  \item \code{RelaxBridge}~--- per-edge alignment.
-  \item \code{GraphBridge}~--- CSR$\leftrightarrow$\code{Graph} preimage.
+  \item \code{NumericBridge}~--- 21 IEEE-754 facts (axioms).
+  \item \code{RelaxBridge}~--- per-edge alignment (\textbf{proved}, no axioms).
+  \item \code{GraphBridge}~--- CSR$\leftrightarrow$\code{Graph} preimage
+    (\textbf{proved}, no axioms).
   \item \code{HeapBridge}~--- lazy-heap simulation
     (\code{dijkstraHeap\_eq\_dijkstraRelax} at
-    \code{formal/lean/Sssp/Refine/HeapBridge.lean:20}).
+    \code{formal/lean/Sssp/Refine/HeapBridge.lean:23}; three conditional
+    discharge theorems at :27, :43, :55).
 \end{itemize}
+The sole remaining proof obligation for axiom-free \code{HeapBridge} is
+\code{dijkstraRun\_dHat\_all\_complete\_at\_heapFuel}
+(\code{formal/lean/Sssp/Refine/HeapSimulation.lean}, open).
 Conclude with the headline theorem
 \code{refine\_dijkstra\_correct} from
 \code{formal/lean/Sssp/Refine/RefineCorrectness.lean:23}.}
@@ -746,12 +759,12 @@ will not displace it on workstation-scale inputs.}
 
 \todo{Outline:
 \begin{enumerate}[leftmargin=1.6em,itemsep=0.25em]
-  \item \textbf{Phase~3c: zero-axiom \Dijkstra.} Eliminate the four bridge
-        axiom blocks. NumericBridge: either move to $\mathbb{N}$/\code{WithTop $\mathbb{N}$}
-        weights with an explicit lift, or port a fragment of
-        \textsc{Flocq}~\cite{BoldoMelquiond2011Flocq} to \Lean. RelaxBridge,
-        GraphBridge: structural arguments from \code{fromEdgeList};
-        HeapBridge: an honest heap-simulation proof.
+  \item \textbf{Phase~3c: zero-axiom \Dijkstra.} Close the single remaining
+        \code{HeapBridge} lemma
+        \code{dijkstraRun\_dHat\_all\_complete\_at\_heapFuel}; document
+        \code{NumericBridge} as a stable IEEE-754 specification or, optionally,
+        port a fragment of \textsc{Flocq}~\cite{BoldoMelquiond2011Flocq} to
+        \Lean{} (RelaxBridge and GraphBridge are already discharged).
   \item \textbf{Aeneas-driven extraction.} Replace the hand-translated
         Refine layer with output from
         \textsc{Aeneas}~\cite{HoProtzenko2022Aeneas,HoFromherzProtzenko2024Aeneas},
