@@ -821,29 +821,120 @@ form on these graphs.
 % =====================================================================
 \section{Refinement to Rust: bridge axioms and discharge routes}\label{sec:refine}
 
-\todo{Detailed walk-through of \code{Sssp.Refine.*}:
-the simulation invariant \code{SimInv = (len, aligned, sound)} from
-\code{formal/lean/Sssp/Refine/RelaxBridge.lean:21}; the per-edge
-re-ordering proof \code{relaxOutEdges\_eq\_relaxCsrOut}
-(\code{formal/lean/Sssp/Refine/RelaxBridge.lean:429}); and the two
-axiom-bearing bridge modules plus two fully proved bridges:
-\begin{itemize}
-  \item \code{NumericBridge}~--- 21 IEEE-754 facts (axioms).
-  \item \code{RelaxBridge}~--- per-edge alignment (\textbf{proved}, no axioms).
-  \item \code{GraphBridge}~--- CSR$\leftrightarrow$\code{Graph} preimage
-    (\textbf{proved}, no axioms).
-  \item \code{HeapBridge}~--- lazy-heap simulation
-    (\code{dijkstraHeap\_eq\_dijkstraRelax} at
-    \code{formal/lean/Sssp/Refine/HeapBridge.lean:23}; three conditional
-    discharge theorems at :27, :43, :55).
-\end{itemize}
-The sole remaining proof obligation for axiom-free \code{HeapBridge} is
-\code{dijkstraRun\_dHat\_all\_complete\_at\_heapFuel}
-(\code{formal/lean/Sssp/Refine/HeapSimulation.lean}, open).
-Conclude with the headline theorem
-\code{refine\_dijkstra\_correct} from
-\code{formal/lean/Sssp/Refine/RefineCorrectness.lean:23}.}
+This section connects the verified \code{Algo} layer to the operational
+\code{Refine} model that mirrors \code{src/dijkstra.rs}. Two bridge modules
+still carry axioms (\code{NumericBridge}, \code{HeapBridge}); two others
+(\code{RelaxBridge}, \code{GraphBridge}) are fully proved.
 
+\subsection{The Refine layer}\label{sec:refine-dijkstra}
+
+\code{RustGraph} stores CSR adjacency via \code{head}, \code{edgeTo}, and
+\code{edgeW} (\code{Refine/Dijkstra.lean}, matching \code{src/graph.rs}).
+Distances are \code{List Float}; \code{floatRelaxEdge} implements
+$\dhat[v] \leftarrow \min(\dhat[v], \dhat[u]+w)$.
+\code{dijkstraStep} pops the heap minimum, skips stale entries
+(\code{distStale}), and relaxes outgoing CSR edges---the same control flow
+as Rust.
+\code{dijkstraRun} iterates \code{dijkstraStep} for a fuel bound;
+\code{dijkstraHeap} is the production entry point;
+\code{dijkstraRelax} is the proof-relevant $n$-round float relaxation used
+in the simulation pipeline (\code{Refine/Dijkstra.lean:388--394}).
+
+\subsection{The simulation invariant}\label{sec:refine-sim}
+
+Refinement proofs thread a triple invariant \code{SimInv}
+(\code{RelaxBridge.lean:21}):
+\begin{enumerate}[leftmargin=1.6em,itemsep=0.2em]
+\item \code{len}: the float distance vector has length $n$;
+\item \code{aligned}: each entry equals \code{nnrealToFloat} of the parallel
+      \code{DistEstimate} entry;
+\item \code{sound}: the estimate is sound for \code{trueDist} on
+      \code{vg.toGraph}.
+\end{enumerate}
+Per-edge CSR-vs-\code{Graph} alignment is
+\code{relaxOutEdges\_eq\_relaxCsrOut} (\code{RelaxBridge.lean:429}).
+Round-level lifting is \code{floatRelaxRound\_simInv}
+(\code{Simulation.lean:73}), showing $k$ float rounds mirror $k$ abstract
+\code{relaxRound} steps while preserving \code{SimInv}.
+
+\subsection{Axiom-free RelaxBridge and GraphBridge}\label{sec:refine-proved}
+
+\textbf{RelaxBridge.} Former axioms on per-edge and per-round alignment are
+discharged by length lemmas, \code{floatRelaxEdge\_aligned}, fold induction
+on \code{List.range}, and \code{relaxOutEdges\_eq\_relaxCsrOut}. The module
+contains no \code{axiom} declarations.
+
+\textbf{GraphBridge.} \code{outEdge\_floatWeight\_preimage} links CSR edge
+indices to \code{Graph.outEdges}, using \code{fromEdgeList}'s prefix-sum
+construction. Together with fixture \code{ValidRustGraph} proofs, this
+connects JSON test graphs to the verified \code{Graph n} type.
+
+\subsection{NumericBridge: 21 IEEE-754 facts}\label{sec:refine-numeric}
+
+\code{NumericBridge.lean:80--122} names 21 axioms in four groups:
+
+\paragraph*{Float order and algebra (9 facts).}
+\code{float\_le\_refl}, antisymmetry, transitivity, \code{float\_le\_of\_lt},
+\code{float\_le\_of\_not\_lt}, \code{float\_le\_top}; plus
+\code{floatZero\_add}, \code{float\_add\_assoc}, \code{float\_add\_comm}.
+These would follow from a full IEEE order specification on \code{Float};
+\Mathlib{} does not yet supply them for proof.
+
+\paragraph*{\code{floatWeight} $\leftrightarrow$ \code{Float.ofNat} (4 facts).}
+\code{floatWeight\_eq\_ofNat}, \code{floatWeight\_add},
+\code{floatWeight\_lt\_iff}, \code{floatWeight\_le\_iff} pin nat-cast
+weights to exact \code{Float} arithmetic on small integers---the regime our
+fixtures and Rust code use.
+
+\paragraph*{\code{nnrealToFloat} bridge (4 facts).}
+\code{nnrealToFloat\_monotone}, \code{nnrealToFloat\_trueDist\_add},
+\code{nnrealToFloat\_add\_weight}, \code{nnrealToFloat\_min} lift the
+\code{NNReal} metric through the float embedding used in alignment.
+
+\paragraph*{\code{min} and \code{BEq} (4 facts).}
+\code{float\_min\_eq\_left/right\_of\_le}, \code{float\_eq\_of\_beq} support
+target-vertex relaxations where \code{min} selects the improving branch.
+
+\subsection{HeapBridge: one axiom and three conditional routes}\label{sec:refine-heap}
+
+The standing axiom is
+\begin{verbatim}
+axiom dijkstraHeap_eq_dijkstraRelax (vg : ValidRustGraph n g) (source : Nat) :
+    dijkstraHeap g source = dijkstraRelax g source
+\end{verbatim}
+at \code{HeapBridge.lean:23}. Three theorems discharge it under hypotheses:
+\code{dijkstraHeap\_eq\_dijkstraRelax\_of\_upper} (:27),
+\code{of\_complete} (:43), \code{of\_edgeUpper} (:55).
+
+The proof route is textbook Dijkstra completeness transported to
+\code{dijkstraRun}: with fuel \code{dijkstraHeapFuel g}, show every vertex's
+tentative estimate in \code{dijkstraRun\_dHat} is \code{IsComplete}, then apply
+\code{dijkstraHeap\_eq\_dijkstraRelax\_of\_complete}.
+Supporting lemmas include \code{dijkstraRun\_processed\_card\_le\_fuel},
+\code{freshPop\_isComplete\_of\_processed\_pred}, and schedule lemmas
+\code{dijkstraRun\_dHat\_schedule\_of\_*} in \code{HeapSimulation.lean}.
+
+\textbf{Open obligation.} Prove
+\code{dijkstraRun\_dHat\_all\_complete\_at\_heapFuel}: after heap-loop fuel
+expires, every vertex's estimate equals true distance. This is the single
+remaining cut for axiom-free \code{HeapBridge}.
+
+\subsection{Headline theorem}\label{sec:refine-headline}
+
+\begin{verbatim}
+theorem refine_dijkstra_correct (vg : ValidRustGraph n g) (s v : Fin n) :
+    (dijkstra g s.val)[v.val]! = withTopNatToFloat (trueDistNat vg.toGraph s v)
+\end{verbatim}
+at \code{RefineCorrectness.lean:23--25}. The proof is three steps:
+(1)~\code{dijkstra\_get\_eq\_dijkstraRelax} rewrites heap output to the
+relaxation model;
+(2)~\code{refine\_dijkstraRelax\_correct} connects relaxation to
+\code{trueDistNat} via \code{Simulation} and the bridges;
+(3)~\code{trueDistNat\_toFloat} links the nat shadow to the float answer.
+Step~(2) uses \code{HeapBridge} (axiom) and the axiom-free
+\code{RelaxBridge}/\code{GraphBridge}/\code{NumericBridge} chain.
+
+% =====================================================================
 % =====================================================================
 \section{Fixture-based regression harness}\label{sec:fixtures}
 
