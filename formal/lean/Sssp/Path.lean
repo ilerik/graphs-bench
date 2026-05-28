@@ -125,6 +125,18 @@ lemma exists_first_step_tail {u : Fin n} {w : Walk G s u} (h : 0 < w.numEdges) :
       | cons _ _ _ _ h_edge h_tail =>
         exact ⟨v, w0, ⟨rest, h_tail⟩, rfl, h_edge⟩
 
+lemma exists_first_step_tail_src {src tgt : Fin n} {w : Walk G src tgt} (h : 0 < w.numEdges) :
+    ∃ v w0, ∃ w' : Walk G v tgt, w.steps = (v, w0) :: w'.steps ∧ w0 ∈ G.edges src v := by
+  rcases w with ⟨steps, valid⟩
+  cases steps with
+  | nil => simp [Walk.numEdges] at h
+  | cons p rest =>
+    cases p with
+    | mk v w0 =>
+      cases valid with
+      | cons _ _ _ _ h_edge h_tail =>
+        exact ⟨v, w0, ⟨rest, h_tail⟩, rfl, h_edge⟩
+
 lemma vertices_length (w : Walk G s u) : w.vertices.length = w.numEdges + 1 := by
   simp [Walk.vertices, Walk.numEdges]
 
@@ -220,6 +232,50 @@ lemma takeSteps_steps (k : ℕ) (w : Walk G s t) (hk : k ≤ w.numEdges) :
 
 lemma dropSteps_steps (j : ℕ) (w : Walk G s t) (hj : j ≤ w.numEdges) :
     (dropSteps j w hj).steps = w.steps.drop j := by simp [dropSteps]
+
+/-- Walk length splits along `takeSteps` / `dropSteps`. -/
+lemma length_takeSteps_add_dropSteps {u : Fin n} (w : Walk G s u) {j : ℕ} (hj : j ≤ w.numEdges) :
+    w.length = (takeSteps j w hj).length + (dropSteps j w hj).length := by
+  dsimp [Walk.length, takeSteps, dropSteps]
+  have hjlen : j ≤ (w.steps.map Prod.snd).length := by simpa [Walk.numEdges] using hj
+  calc
+    w.length = (w.steps.map Prod.snd).sum := rfl
+    _ = ((w.steps.map Prod.snd).take j).sum + ((w.steps.map Prod.snd).drop j).sum :=
+      (List.sum_take_add_sum_drop (w.steps.map Prod.snd) j).symm
+    _ = (List.map Prod.snd (w.steps.take j)).sum + (List.map Prod.snd (w.steps.drop j)).sum := by
+      simp [List.map_take, List.map_drop]
+    _ = (takeSteps j w hj).length + (dropSteps j w hj).length := rfl
+
+/-- A one-edge suffix after `dropSteps` is a single edge into the target. -/
+lemma dropSteps_one_edge {j : ℕ} {w : Walk G s u} (hj : j ≤ w.numEdges)
+    (h : (dropSteps j w hj).numEdges = 1) :
+    ∃ wt, wt ∈ G.edges (vertexAt w j hj) u ∧
+      (dropSteps j w hj).length = wt ∧
+      w.length = (takeSteps j w hj).length + wt := by
+  set tail := dropSteps j w hj
+  have hm : 0 < tail.numEdges := by rw [h]; omega
+  obtain ⟨v, wt, w', hsteps, h_edge⟩ := exists_first_step_tail hm
+  have hw'nil : w'.steps = [] := by
+    have hn : w'.steps.length = 0 := by
+      have hlen : w'.steps.length + 1 = tail.steps.length := by
+        simpa [List.length_cons] using congrArg List.length hsteps.symm
+      have htail : tail.steps.length = 1 := by simpa [Walk.numEdges] using h
+      linarith
+    exact List.eq_nil_of_length_eq_zero hn
+  have hvu : v = u := by
+    have hvalid := w'.valid
+    rw [hw'nil] at hvalid
+    cases hvalid with
+    | nil hTU => exact hTU
+  have hlen_tail : tail.length = wt := by
+    have hsteps' : tail.steps = [(v, wt)] := by simpa [hw'nil] using hsteps
+    rcases tail with ⟨steps, valid⟩
+    subst hsteps'
+    simp [Walk.length]
+  refine ⟨wt, ?_, hlen_tail, ?_⟩
+  · simpa [vertexAt_zero, dropSteps, hvu] using h_edge
+  · rw [← hlen_tail]
+    simpa [tail, dropSteps] using length_takeSteps_add_dropSteps (w := w) (j := j) hj
 
 lemma cast_dropSteps_steps {u : Fin n} {i j : ℕ} (w : Walk G s u) (hi : i ≤ w.numEdges) (hj : j ≤ w.numEdges)
     (hdup : vertexAt w i hi = vertexAt w j hj) :

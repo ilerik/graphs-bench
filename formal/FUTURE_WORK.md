@@ -13,14 +13,16 @@ document Rust refinement for `src/dijkstra.rs`.
 | 3c.1 | `nnrealToFloat_add_weight`, float order lemmas | `NumericBridge` | in progress (21 axioms) |
 | 3c.2 | `floatRelax*_aligned` (3 axioms) | `RelaxBridge` | **DONE** |
 | 3c.3 | `outEdge_floatWeight_preimage` | `GraphBridge` | **DONE** |
-| 3c.4 | `dijkstraRun_dHat_all_complete_at_heapFuel` → discharge `dijkstraHeap_eq_dijkstraRelax` via `dijkstraHeap_eq_dijkstraRelax_of_complete` | `HeapBridge` | open (1 axiom + 3 conditional theorems proved) |
-| 3c.5 | Rust ↔ `Refine.dijkstra` refinement note | `src/dijkstra.rs` | not started |
+| 3c.4 | Prove `HeapSettlement` (or its fields) → discharge `dijkstraHeap_eq_dijkstraRelax` | `HeapSimulation` / `HeapBridge` | open (1 axiom; `*_of_settlement` wired) |
+| 3c.5 | Rust ↔ `Refine.dijkstra` refinement note | `formal/RUST_DIJKSTRA_REFINEMENT.md` | **DONE** (doc) |
 
-**Proved recently:** `dijkstraHeap_eq_dijkstraRelax_of_{upper,complete,edgeUpper}`,
-`dijkstraRun_dHat_schedule_of_{all_complete,upper}`, `dijkstraRun_processed_card_le_fuel`,
-`freshPop_isComplete_of_processed_pred`, `outEdge_floatWeight_preimage`,
-fixture `ValidRustGraph`, `nnrealToFloat_add_weight_ofNat`,
-`floatRelaxEdge_aligned_ne`, unconditional `refine_dijkstra_correct`.
+**Proved recently:** `dijkstraRun_{fresh,stale}Count`, `dijkstraRun_freshCount_add_staleCount`,
+`dijkstraRun_freshCount_ge_n_add_one_{of_stale_bound,at_heapFuel}`, `HeapSettlement`,
+`dijkstraRun_dHat_all_complete_at_heapFuel`, `dijkstraRun_dHat_schedule_of_settlement`,
+`dijkstraHeap_eq_dijkstraRelax_of_settlement`, `dijkstraHeap_eq_dijkstraRelax_of_{upper,complete,edgeUpper}`,
+`freshPop_isComplete_of_setComplete`, unconditional `refine_dijkstra_correct`.
+
+**Open inside `HeapSettlement`:** `staleBound`, per-step `setComplete` / `processed_univ` (see settlement comments in `HeapSimulation.lean`).
 
 **Do not start Phase 4** until 3c is done or explicitly deferred.
 

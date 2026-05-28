@@ -68,6 +68,19 @@ theorem dijkstra_get_eq_dijkstraRelax (vg : ValidRustGraph n g) (s v : Fin n) :
     (dijkstra g s.val)[v.val]! = (dijkstraRelax g s.val)[v.val]! := by
   rw [dijkstra, dijkstraHeap_eq_dijkstraRelax vg s.val]
 
+/-- Discharge the heap bridge once `HeapSettlement` holds (see `HeapSimulation`). -/
+theorem dijkstraHeap_eq_dijkstraRelax_of_settlement {vg : ValidRustGraph n g} (s : Fin n)
+    (hSettle : HeapSettlement vg s) :
+    dijkstraHeap g s.val = dijkstraRelax g s.val := by
+  have hSchedule :=
+    dijkstraRun_dHat_schedule_of_settlement (vg := vg) s hSettle
+  have hSchedule' :
+      dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) =
+      relaxRound vg.toGraph g.n (initEstimate s) := by
+    simpa [vg.hn] using hSchedule
+  exact dijkstraHeap_eq_dijkstraRelax_of_schedule (vg := vg) s hSchedule'
+
 /-- Regression: heap ≡ relax on shared JSON fixture graphs. -/
 example : distsMatch (dijkstra tinyChainRust 0) (dijkstraRelax tinyChainRust 0) = true := by
   native_decide

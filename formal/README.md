@@ -12,9 +12,9 @@ Mathlib**, the algorithms implemented in `../src/`.  Target paper:
 The Lean code in `lean/` compiles without `sorry` throughout `Sssp.*`.
 **Phase 3b is complete:** `refine_dijkstra_correct` holds unconditionally on
 every `ValidRustGraph`. **Phase 3c is partially done:** `RelaxBridge` and
-`GraphBridge` are axiom-free; `HeapBridge` is reduced to one open lemma
-(`dijkstraRun_dHat_all_complete_at_heapFuel`) plus three conditional discharge
-theorems already proved; `NumericBridge` documents 21 IEEE-754 facts as named
+`GraphBridge` are axiom-free; `HeapBridge` is reduced to one axiom plus conditional discharge theorems
+(`*_of_{complete,edgeUpper,settlement}`); the target contract is `HeapSettlement`
+in `HeapSimulation`. `NumericBridge` documents 21 IEEE-754 facts as named
 axioms (22 axioms total across 2 modules).
 
 BMSSP and other paper algorithms remain spec-oracle only. The architecture is a

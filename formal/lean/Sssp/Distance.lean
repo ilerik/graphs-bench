@@ -276,6 +276,159 @@ theorem exists_shortest_bounded_walk {n : ℕ} (G : Graph n) (s u : Fin n)
     simpa [← walksOfLength_numEdges hwk] using Nat.le_of_lt_succ hk
   exact ⟨w, heq, hn⟩
 
+private lemma trueDist_eq_length_of_shortest {n : ℕ} {G : Graph n} {s u : Fin n}
+    {walk : Walk G s u} (heq : (walk.length : WithTop NNReal) = trueDist G s u) :
+    trueDist G s u = walk.length := heq.symm
+
+private lemma walk_numEdges_zero_eq_source {n : ℕ} {G : Graph n} {s u : Fin n}
+    {walk : Walk G s u} (h : walk.numEdges = 0) : u = s := by
+  rcases walk with ⟨steps, valid⟩
+  match steps with
+  | [] =>
+    cases valid with
+    | nil heq' => exact heq'.symm
+  | _ :: _ => simp [Walk.numEdges] at h
+
+private lemma wt_eq_zero_of_dist_le_add {n : ℕ} {G : Graph n} {s x : Fin n} {wt : NNReal}
+    (hfinx : trueDist G s x < ⊤) (hle : trueDist G s x + wt ≤ trueDist G s x) : wt = 0 := by
+  have hle' : trueDist G s x + (wt : WithTop NNReal) ≤ trueDist G s x + 0 := by simpa [add_zero] using hle
+  have h := WithTop.le_of_add_le_add_left (ne_of_lt hfinx) hle'
+  simpa [NNReal.coe_eq_zero] using WithTop.coe_le_coe.mp h
+
+/-- Last step of a nonempty walk is one edge into the target. -/
+private lemma exists_last_edge_of_pos {n : ℕ} {G : Graph n} {s u : Fin n}
+    (walk : Walk G s u) (hm : 0 < walk.numEdges) :
+    ∃ x wt, wt ∈ G.edges x u ∧
+      x = walk.vertexAt (walk.numEdges - 1) (Nat.pred_le walk.numEdges) ∧
+      walk.length =
+        (walk.takeSteps (walk.numEdges - 1) (Nat.pred_le walk.numEdges)).length + wt ∧
+      (walk.dropSteps (walk.numEdges - 1) (Nat.pred_le walk.numEdges)).length = wt := by
+  let j := walk.numEdges - 1
+  let hj := Nat.pred_le walk.numEdges
+  have hdrop : (walk.dropSteps j hj).numEdges = 1 := by
+    rw [Walk.numEdges_dropSteps]
+    dsimp [j]
+    omega
+  set tail := walk.dropSteps j hj
+  have hm : 0 < tail.numEdges := by rw [hdrop]; omega
+  obtain ⟨v, wt, tailWalk, hsteps, h_edge⟩ := Walk.exists_first_step_tail hm
+  have hw'nil : tailWalk.steps = [] := by
+    have hn : tailWalk.steps.length = 0 := by
+      have hlen : tailWalk.steps.length + 1 = tail.steps.length := by
+        simpa [List.length_cons] using congrArg List.length hsteps.symm
+      have htail : tail.steps.length = 1 := by simpa [Walk.numEdges] using hdrop
+      linarith
+    exact List.eq_nil_of_length_eq_zero hn
+  have hvu : v = u := by
+    have hvalid := tailWalk.valid
+    rw [hw'nil] at hvalid
+    cases hvalid with
+    | nil hTU => exact hTU
+  have hlen_tail : tail.length = wt := by
+    have hsteps' : tail.steps = [(v, wt)] := by
+      rw [hw'nil] at hsteps
+      simpa using hsteps
+    rcases tail with ⟨steps, valid⟩
+    subst hsteps'
+    simp [Walk.length]
+  refine ⟨walk.vertexAt j hj, wt,
+    by simpa [Walk.vertexAt_zero, Walk.dropSteps, hvu] using h_edge, rfl, ?_, hlen_tail⟩
+  rw [← hlen_tail]
+  simpa [tail, Walk.dropSteps] using Walk.length_takeSteps_add_dropSteps (w := walk) (j := j) hj
+
+private lemma numEdges_cast {n : ℕ} {G : Graph n} {s v u : Fin n} (h : v = u) (w : Walk G s v) :
+    (cast (congr_arg (Walk G s) h) w).numEdges = w.numEdges := by subst h; rfl
+
+private lemma length_cast {n : ℕ} {G : Graph n} {s v u : Fin n} (h : v = u) (w : Walk G s v) :
+    (cast (congr_arg (Walk G s) h) w).length = w.length := by subst h; rfl
+
+private lemma trueDist_le_takeSteps_length {n : ℕ} {G : Graph n} {s u : Fin n}
+    (walk : Walk G s u) {j : ℕ} (hj : j ≤ walk.numEdges) :
+    trueDist G s (walk.vertexAt j hj) ≤ (walk.takeSteps j hj).length :=
+  trueDist_le_walk_length G s (walk.vertexAt j hj) (walk.takeSteps j hj)
+
+/-- Core induction on walk length: a shortest bounded walk yields a tight predecessor in `S`. -/
+private theorem exists_tight_pred_of_min_outside_go {n : ℕ} (G : Graph n) (s u : Fin n)
+    (S : Finset (Fin n)) (hu : u ∉ S) (hs : s ∈ S)
+    (hmin : ∀ y ∉ S, trueDist G s u ≤ trueDist G s y) (_hfin : trueDist G s u < ⊤)
+    (hdist : ∀ {v w : Fin n}, v ≠ w → trueDist G s v ≠ trueDist G s w) :
+    ∀ (m : ℕ) (walk : Walk G s u), walk.numEdges = m → m ≤ n →
+      (walk.length : WithTop NNReal) = trueDist G s u →
+      ∃ x ∈ S, ∃ w : NNReal, w ∈ G.edges x u ∧ trueDist G s u = trueDist G s x + w := by
+  intro m walk hm hbound heq
+  induction m using Nat.strong_induction_on generalizing walk heq with
+  | h m ih =>
+    by_cases hm0 : m = 0
+    · subst hm0
+      have hu' : u = s := walk_numEdges_zero_eq_source (walk := walk) hm
+      subst hu'
+      exact absurd hs hu
+    have hmpos : 0 < m := Nat.pos_of_ne_zero (fun h => hm0 h)
+    have hmpos' : 0 < walk.numEdges := by simpa [hm] using hmpos
+    obtain ⟨x, wt, hwt, hx, hlen_split, _⟩ :=
+      exists_last_edge_of_pos (walk := walk) hmpos'
+    let j := walk.numEdges - 1
+    let hj := Nat.pred_le walk.numEdges
+    have hle_prefix' : trueDist G s (walk.vertexAt j hj) ≤ (walk.takeSteps j hj).length :=
+      trueDist_le_takeSteps_length (walk := walk) (j := j) (hj := hj)
+    have hle_prefix : trueDist G s x ≤ (walk.takeSteps j hj).length := by
+      simpa [hx] using hle_prefix'
+    have hle_upper : trueDist G s u ≤ trueDist G s x + wt := by
+      calc
+        trueDist G s u ≤ trueDist G s x + trueDist G x u := trueDist_triangle G s x u
+        _ ≤ trueDist G s x + wt := add_le_add (le_refl _) (trueDist_edge G x u wt hwt)
+    have hle_lower : trueDist G s x + wt ≤ trueDist G s u := by
+      rw [heq.symm, hlen_split]
+      exact add_le_add_left hle_prefix wt
+    by_cases hxS : x ∈ S
+    · refine ⟨x, hxS, wt, hwt, (hle_lower.antisymm hle_upper).symm⟩
+    · by_cases hpos : 0 < wt
+      · exfalso
+        have hfinx : trueDist G s x < ⊤ := lt_of_le_of_lt hle_prefix (WithTop.coe_lt_top _)
+        exact ne_of_gt hpos (wt_eq_zero_of_dist_le_add hfinx (le_trans hle_lower (hmin x hxS)))
+      · have hwt_zero : wt = 0 := le_antisymm (not_lt.mp hpos) (zero_le wt)
+        have heqdist : trueDist G s u = trueDist G s x :=
+          le_antisymm (hmin x hxS) (by
+            rw [heq.symm, hlen_split, hwt_zero, add_zero]
+            exact hle_prefix)
+        rcases eq_or_ne x u with hxu | hxu
+        · have hm1 : 1 < m := by
+            by_contra hnot
+            push_neg at hnot
+            have h1 : m = 1 := by omega
+            subst h1
+            simp [j, hm, Walk.vertexAt_zero] at hx
+            have hxs : x = s := by simpa [j, hm, Walk.vertexAt_zero] using hx
+            exact hxS (hxs ▸ hs)
+          have hva : walk.vertexAt j hj = u := (hxu.symm.trans hx).symm
+          let wprefix := walk.takeSteps j hj
+          have hnum : wprefix.numEdges = m - 1 := by
+            simpa [wprefix, Walk.numEdges_takeSteps, j, hm] using
+              Walk.numEdges_takeSteps j walk hj
+          have hwp_len : wprefix.length = walk.length := by
+            apply Eq.symm
+            rw [hlen_split, hwt_zero, add_zero]
+          have hco : (wprefix.length : WithTop NNReal) = (walk.length : WithTop NNReal) :=
+            WithTop.coe_eq_coe.mpr hwp_len
+          have heq' : (wprefix.length : WithTop NNReal) = trueDist G s u := hco.trans heq
+          let wcast : Walk G s u := cast (congr_arg (Walk G s) hva) wprefix
+          have hnum' : wcast.numEdges = m - 1 := by rw [numEdges_cast hva, hnum]
+          have heq'' : (wcast.length : WithTop NNReal) = trueDist G s u := by
+            rw [← heq', WithTop.coe_inj.mpr (length_cast hva wprefix)]
+          exact ih (m - 1) (by omega) wcast hnum'
+            (Nat.le_trans (Nat.sub_le _ _) hbound) heq''
+        · exact absurd heqdist.symm (hdist hxu)
+
+/-- Among vertices outside `S`, a minimum-`trueDist` vertex has a tight settled predecessor in `S`. -/
+theorem exists_tight_pred_of_min_outside {n : ℕ} (G : Graph n) {s u : Fin n}
+    (S : Finset (Fin n)) (hu : u ∉ S) (hs : s ∈ S)
+    (hmin : ∀ y ∉ S, trueDist G s u ≤ trueDist G s y) (hfin : trueDist G s u < ⊤)
+    (hdist : ∀ {v w : Fin n}, v ≠ w → trueDist G s v ≠ trueDist G s w) :
+    ∃ x ∈ S, ∃ w : NNReal, w ∈ G.edges x u ∧ trueDist G s u = trueDist G s x + w := by
+  obtain ⟨walk, heq, hn⟩ := exists_shortest_bounded_walk G s u hfin
+  exact exists_tight_pred_of_min_outside_go (G := G) (s := s) (u := u) S hu hs hmin hfin hdist
+    walk.numEdges walk rfl hn heq
+
 /-- Soundness invariant maintained throughout the algorithm:
     `d̂[v] ≥ d(v)` for every `v`. -/
 def Sound {n : ℕ} (G : Graph n) (s : Fin n) (dHat : DistEstimate n) : Prop :=
@@ -440,6 +593,15 @@ lemma mem_expectU_iff {n : ℕ} {G : Graph n} {s : Fin n} {dHat : DistEstimate n
     `|U| ≤ 4k` of `baseCase` constructively provable. -/
 class HasDistinctVertexDistances {n : ℕ} (G : Graph n) (s : Fin n) : Prop where
   distinct : ∀ {u v : Fin n}, u ≠ v → trueDist G s u ≠ trueDist G s v
+
+/-- Same conclusion under globally distinct vertex distances (e.g. BMSSP assumption). -/
+theorem exists_tight_pred_of_min_outside_distinct {n : ℕ} (G : Graph n) {s u : Fin n}
+    (S : Finset (Fin n)) (hu : u ∉ S) (hs : s ∈ S)
+    (hmin : ∀ y ∉ S, trueDist G s u ≤ trueDist G s y) (hfin : trueDist G s u < ⊤)
+    [HasDistinctVertexDistances G s] :
+    ∃ x ∈ S, ∃ w : NNReal, w ∈ G.edges x u ∧ trueDist G s u = trueDist G s x + w :=
+  exists_tight_pred_of_min_outside (G := G) (s := s) S hu hs hmin hfin
+    (fun {v w} hne => HasDistinctVertexDistances.distinct (G := G) (s := s) hne)
 
 /-! ### Truncation witness
 

@@ -121,6 +121,13 @@ axiom float_le_of_lt {a b : Float} (h : a < b) : a ≤ b
 axiom float_le_trans {a b c : Float} (hab : a ≤ b) (hbc : b ≤ c) : a ≤ c
 axiom float_eq_of_beq {a b : Float} (h : (a == b) = true) : a = b
 
+/-- On nat-cast estimates, `nnrealToFloat` reflects `≤`. -/
+theorem nnrealToFloat_le_reflects_ofNat {a b : Nat}
+    (h : nnrealToFloat (a : WithTop NNReal) ≤ nnrealToFloat (b : WithTop NNReal)) :
+    (a : WithTop NNReal) ≤ (b : WithTop NNReal) := by
+  have hnn : a ≤ b := (floatWeight_le_iff a b).1 (by simpa [nnrealToFloat_ofNat] using h)
+  simpa [WithTop.some_eq_coe] using Nat.cast_le.mpr hnn
+
 end FloatNat
 
 open FloatNat
