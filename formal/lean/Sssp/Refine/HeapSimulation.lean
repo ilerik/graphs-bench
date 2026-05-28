@@ -700,7 +700,7 @@ theorem dijkstraRun_dHat_source_eq {vg : ValidRustGraph n g} (s : Fin n) (fuel :
     4. `dijkstraRun_freshCount_at_heapFuel ≥ n` — reduce via `dijkstraRun_freshCount_ge_n_add_one_of_stale_bound`
        · stale bound `dijkstraRun_staleCount ≤ n * edgeTo.length` still open
        · `dijkstraRun_processed_card_le_freshCount` — ✓ `|processed| ≤ freshCount`
-       · fresh pops insert new vertices → `processed.card = n` still open
+       · `FreshPopInsertsNew` → `processed.card = freshCount`; with `freshCount ≥ n` → `processed_univ`
     5. `edgeUpper_of_processedEdgeUpper_univ` — ✓ close from `ProcessedEdgeUpper` + `SetComplete` on univ
     6. Target: `dijkstraRun_dHat_all_complete_at_heapFuel` → `dijkstraRun_dHat_schedule` →
        `dijkstraHeap_eq_dijkstraRelax_of_schedule`
@@ -1044,6 +1044,53 @@ theorem dijkstraRun_processed_card_le_freshCount {vg : ValidRustGraph n g} (dist
   simpa [dijkstraRun_processed] using
     dijkstraRun_processedAcc_card_le_acc_add_freshCount (vg := vg) dist heap hHeap fuel ∅
 
+/-- Each fresh pop extends the processed accumulator (`u` was not already counted). -/
+def FreshPopInsertsNew {n : ℕ} {g : RustGraph} (vg : ValidRustGraph n g) : Prop :=
+  ∀ (dist : List Float) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap)
+    (acc : Finset (Fin n)) (u : Fin n),
+    dijkstraStep_freshVertex vg dist heap hHeap = some u → u ∉ acc
+
+theorem dijkstraRun_processedAcc_card_eq_acc_add_freshCount {vg : ValidRustGraph n g} (dist : List Float)
+    (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) (fuel : Nat)
+    (acc : Finset (Fin n)) (hNew : FreshPopInsertsNew (vg := vg)) :
+    (dijkstraRun_processedAcc vg dist heap hHeap fuel acc).card =
+      acc.card + dijkstraRun_freshCount fuel g dist heap := by
+  induction fuel generalizing dist heap hHeap acc with
+  | zero => simp [dijkstraRun_processedAcc, dijkstraRun_freshCount]
+  | succ fuel ih =>
+    simp only [dijkstraRun_processedAcc, dijkstraRun_freshCount]
+    cases hf : dijkstraStep_freshVertex vg dist heap hHeap with
+    | none =>
+      have hfresh : dijkstraStep_isFresh dist heap = false := by
+        match hif : dijkstraStep_isFresh dist heap with
+        | false => rfl
+        | true =>
+          exfalso
+          rcases dijkstraStep_freshVertex_some_of_isFresh_true (vg := vg) dist heap hHeap hif with
+            ⟨u, hsome⟩
+          rw [hf] at hsome
+          exact (Option.some_ne_none u).elim (Eq.symm hsome)
+      have hstep := ih (dijkstraStep g dist heap).1 (dijkstraStep g dist heap).2
+        (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap) acc
+      simp [hf, hfresh, if_false, hstep]
+    | some u =>
+      have hfresh : dijkstraStep_isFresh dist heap = true :=
+        dijkstraStep_isFresh_eq_true_of_freshVertex_some (vg := vg) dist heap hHeap u hf
+      have hu : u ∉ acc := hNew dist heap hHeap acc u hf
+      have hcard : (insert u acc).card = acc.card + 1 := Finset.card_insert_of_notMem hu
+      have hstep := ih (dijkstraStep g dist heap).1 (dijkstraStep g dist heap).2
+        (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap) (insert u acc)
+      simp only [hf, hfresh, if_true, hcard, hstep]
+      omega
+
+theorem dijkstraRun_processed_card_eq_freshCount {vg : ValidRustGraph n g} (dist : List Float)
+    (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) (fuel : Nat)
+    (hNew : FreshPopInsertsNew (vg := vg)) :
+    (dijkstraRun_processed vg dist heap hHeap fuel).card =
+      dijkstraRun_freshCount fuel g dist heap := by
+  simpa [dijkstraRun_processed] using
+    dijkstraRun_processedAcc_card_eq_acc_add_freshCount (vg := vg) dist heap hHeap fuel ∅ hNew
+
 /-- At `dijkstraHeapFuel`, a stale bound is equivalent to `freshCount ≥ n + 1` (fuel identity). -/
 theorem dijkstraRun_staleBound_iff_freshCount_ge_at_heapFuel {vg : ValidRustGraph n g} (s : Fin n) :
     (dijkstraRun_staleCount (dijkstraHeapFuel g) g (initDist g s.val) [⟨0.0, s.val⟩] ≤
@@ -1091,6 +1138,44 @@ theorem dijkstraRun_processed_eq_univ_of_card_eq_n {vg : ValidRustGraph n g} (di
     (h : (dijkstraRun_processed vg dist heap hHeap fuel).card = n) :
     dijkstraRun_processed vg dist heap hHeap fuel = Finset.univ :=
   Finset.card_eq_univ_of_card_eq_fin h
+
+theorem dijkstraRun_processed_eq_univ_at_heapFuel_of_freshCount_ge_and_card {vg : ValidRustGraph n g}
+    (s : Fin n)
+    (hFresh :
+      n ≤
+        dijkstraRun_freshCount (dijkstraHeapFuel g) g (initDist g s.val) [⟨0.0, s.val⟩])
+    (hCard :
+      (dijkstraRun_processed vg (initDist g s.val) [⟨0.0, s.val⟩]
+          (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g)).card =
+        dijkstraRun_freshCount (dijkstraHeapFuel g) g (initDist g s.val) [⟨0.0, s.val⟩]) :
+    dijkstraRun_processed vg (initDist g s.val) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) = Finset.univ := by
+  have hle :=
+    dijkstraRun_processed_card_le_freshCount (vg := vg) (initDist g s.val) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g)
+  have hfin :
+      (dijkstraRun_processed vg (initDist g s.val) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g)).card ≤ n := by
+    simpa [Fintype.card_fin] using
+      Finset.card_le_univ (s := dijkstraRun_processed vg (initDist g s.val) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g))
+  have hEq : (dijkstraRun_processed vg (initDist g s.val) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g)).card = n := by
+    omega
+  exact dijkstraRun_processed_eq_univ_of_card_eq_n (vg := vg) (initDist g s.val) [⟨0.0, s.val⟩]
+    (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) hEq
+
+theorem dijkstraRun_processed_eq_univ_at_heapFuel_of_freshPopInsertsNew {vg : ValidRustGraph n g}
+    (s : Fin n) (hFresh :
+      n ≤
+        dijkstraRun_freshCount (dijkstraHeapFuel g) g (initDist g s.val) [⟨0.0, s.val⟩])
+    (hNew : FreshPopInsertsNew (vg := vg)) :
+    dijkstraRun_processed vg (initDist g s.val) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) = Finset.univ := by
+  have hCard :=
+    dijkstraRun_processed_card_eq_freshCount (vg := vg) (initDist g s.val) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) hNew
+  exact dijkstraRun_processed_eq_univ_at_heapFuel_of_freshCount_ge_and_card (vg := vg) s hFresh hCard
 
 /-- Reduce heap-side completeness to edge-upper bounds once `dHat s = 0`. -/
 theorem dijkstraRun_dHat_all_complete_of_edgeUpper {vg : ValidRustGraph n g} (s : Fin n)
