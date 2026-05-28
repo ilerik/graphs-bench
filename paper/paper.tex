@@ -772,15 +772,51 @@ Lean module & Paper section & Rust source \\
 % =====================================================================
 \section{The verified abstract \Dijkstra}\label{sec:algo}
 
-\todo{Step through \code{Sssp.Algo.dijkstra = relaxRound G n (initEstimate s)}
-(\code{formal/lean/Sssp/Algo/Dijkstra.lean:22}) and the two-part proof:
-soundness via \code{relax\_sound}
-(\code{formal/lean/Sssp/Dijkstra.lean:57}) and completeness via
-\code{relaxRound\_le\_initWalk}
-(\code{formal/lean/Sssp/Algo/Dijkstra.lean:231}), the latter using a
-length-$\le n$ walk extracted from
-\code{formal/lean/Sssp/Distance.lean:264}. Quote the closed theorem
-\code{dijkstra\_correct} from \code{formal/lean/Sssp/Algo/Dijkstra.lean:318}.}
+The verified algorithm lives in \code{Sssp.Algo.Dijkstra}. It performs
+$n$ global relaxation rounds on a directed graph \code{G : Graph n} with
+non-negative \code{NNReal} edge weights.
+
+\paragraph*{Definition.}
+One round relaxes every vertex's outgoing edges:
+\code{relaxAll} folds \code{relaxOutEdges} over \code{List.finRange n};
+\code{relaxRound G fuel} recurses on \code{fuel}; and
+\begin{verbatim}
+def dijkstra (G : Graph n) (s : Fin n) : DistEstimate n :=
+  relaxRound G n (initEstimate s)
+\end{verbatim}
+at \code{formal/lean/Sssp/Algo/Dijkstra.lean:27--28}.
+The source estimate sets $\dhat[s]=0$ and $\dhat[v]=\top$ elsewhere
+(\code{initEstimate}).
+
+\paragraph*{Soundness.}
+The shared lemma \code{relax\_sound}
+(\code{formal/lean/Sssp/Dijkstra.lean:57}) shows that if $\dhat$ is
+\emph{sound} ($\dhat[v] \geq \code{trueDist}\,G\,s\,v$ for all $v$), then
+relaxing any edge preserves soundness. Induction on \code{fuel} yields
+\code{relaxRound\_sound}: after any number of rounds, estimates remain
+lower bounds on true distance.
+
+\paragraph*{Completeness.}
+For a vertex $v$ with finite distance, \code{exists\_shortest\_bounded\_walk}
+(\code{formal/lean/Sssp/Distance.lean:264}) supplies a walk of length
+$\leq n$ whose weight equals \code{trueDist}. The private lemma
+\code{relaxRound\_le\_initWalk} (\code{Algo/Dijkstra.lean:319}) shows that
+$n$ rounds of relaxation along such a walk bring $\dhat[v]$ down to the walk
+length, hence to \code{trueDist}. Together with soundness,
+\code{dijkstra\_le\_trueDist} and \code{dijkstra\_ge\_trueDist} close the gap.
+
+\paragraph*{Closed theorem.}
+\begin{verbatim}
+theorem dijkstra_correct {G : Graph n} {s v : Fin n} :
+    dijkstra G s v = dijkstraSpec G s v
+\end{verbatim}
+at \code{formal/lean/Sssp/Algo/Dijkstra.lean:479--480}.
+Since \code{dijkstraSpec} equals \code{trueDist}
+(\code{Dijkstra.lean:46--52}), this is
+the statement that $n$-round relaxation computes exact shortest-path
+distances on non-negative weighted graphs---the textbook \Dijkstra{}
+invariant in a round-based presentation equivalent to the priority-queue
+form on these graphs.
 
 % =====================================================================
 \section{Refinement to Rust: bridge axioms and discharge routes}\label{sec:refine}
