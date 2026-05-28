@@ -134,5 +134,24 @@ theorem dist_eq_of_simInv_dHat_eq {vg : ValidRustGraph n g} {s : Fin n}
   subst heq
   exact simInv_dist_eq h1 h2
 
+/-- Equal float distances when both `SimInv` estimates are complete at every vertex. -/
+theorem dist_eq_of_simInv_both_complete {vg : ValidRustGraph n g} {s : Fin n}
+    {d1 d2 : List Float} {dHat1 dHat2 : DistEstimate n}
+    (h1 : SimInv vg s d1 dHat1) (h2 : SimInv vg s d2 dHat2)
+    (hc1 : ∀ v, IsComplete vg.toGraph s dHat1 v)
+    (hc2 : ∀ v, IsComplete vg.toGraph s dHat2 v) :
+    d1 = d2 := by
+  refine List.ext_getElem (by rw [h1.len, h2.len]) ?_
+  intro i hi _
+  have hi' : i < n := lt_of_lt_of_eq hi h1.len
+  let v : Fin n := ⟨i, hi'⟩
+  exact getElem_eq_of_getElem! hi (h1.len.trans h2.len.symm)
+    (by rw [h1.aligned v, h2.aligned v, hc1 v, hc2 v])
+
+theorem relaxRound_n_all_complete (G : Graph n) (s : Fin n) (v : Fin n) :
+    IsComplete G s (relaxRound G n (initEstimate s)) v := by
+  simpa [Algo.dijkstra] using
+    (Algo.dijkstra_correct (G := G) (s := s) (v := v)).trans (dijkstraSpec_correct G s v)
+
 end Refine
 end Sssp

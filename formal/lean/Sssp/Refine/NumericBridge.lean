@@ -119,6 +119,7 @@ axiom float_min_eq_right_of_le {a b : Float} (h : b ≤ a) : min a b = b
 axiom float_le_of_not_lt {a b : Float} (h : ¬a < b) : b ≤ a
 axiom float_le_of_lt {a b : Float} (h : a < b) : a ≤ b
 axiom float_le_trans {a b c : Float} (hab : a ≤ b) (hbc : b ≤ c) : a ≤ c
+axiom float_eq_of_beq {a b : Float} (h : (a == b) = true) : a = b
 
 end FloatNat
 

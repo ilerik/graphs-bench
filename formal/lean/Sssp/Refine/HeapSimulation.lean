@@ -181,6 +181,79 @@ private theorem heapFoldMinPick_eq :
     (fun acc it => if it.d < acc.d || (it.d == acc.d && it.v < acc.v) then it else acc) =
       heapFoldMinPick := rfl
 
+private theorem heapFoldMinPick_self (x : HeapItem) : heapFoldMinPick x x = x := by
+  unfold heapFoldMinPick
+  split_ifs <;> simp
+
+private theorem heapFoldMinPick_le_acc (acc it : HeapItem) :
+    (heapFoldMinPick acc it).d ≤ acc.d := by
+  unfold heapFoldMinPick
+  split
+  next h =>
+    rw [Bool.or_eq_true] at h
+    rcases h with hlt | htie
+    · rw [decide_eq_true_iff] at hlt
+      exact float_le_of_lt hlt
+    · have heq : (it.d == acc.d) = true := by
+        rcases (Bool.and_eq_true_iff.mp htie) with ⟨heq, _⟩
+        exact heq
+      rw [float_eq_of_beq heq]
+      exact float_le_refl acc.d
+  · exact float_le_refl acc.d
+
+private theorem heapFoldMinPick_le_it (acc it : HeapItem) :
+    (heapFoldMinPick acc it).d ≤ it.d := by
+  unfold heapFoldMinPick
+  split
+  · exact float_le_refl it.d
+  next hneg =>
+    exact float_le_of_not_lt (by
+      intro hlt
+      have hor : (it.d < acc.d || (it.d == acc.d && it.v < acc.v)) = true := by
+        simp [hlt, Bool.or_eq_true]
+      exact hneg hor)
+
+private theorem foldl_heapFoldMinPick_le_init (init : HeapItem) :
+    ∀ xs, (List.foldl heapFoldMinPick init xs).d ≤ init.d := by
+  intro xs
+  induction xs generalizing init with
+  | nil => exact float_le_refl init.d
+  | cons y ys ih =>
+    dsimp [List.foldl]
+    exact float_le_trans (ih (heapFoldMinPick init y)) (heapFoldMinPick_le_acc init y)
+
+private theorem foldl_heapFoldMinPick_min (init : HeapItem) :
+    ∀ xs vertex, vertex ∈ init :: xs → (List.foldl heapFoldMinPick init xs).d ≤ vertex.d := by
+  intro xs vertex hmem
+  induction xs generalizing init vertex with
+  | nil =>
+    rcases List.mem_cons.mp hmem with rfl | h
+    · exact float_le_refl _
+    · simp at h
+  | cons y ys ih =>
+    simp only [List.foldl_cons, List.mem_cons] at hmem ⊢
+    rcases hmem with hvInit | hvRest
+    · rw [hvInit]
+      exact foldl_heapFoldMinPick_le_init init (y :: ys)
+    · rcases hvRest with hvY | hvYs
+      · rw [hvY]
+        exact float_le_trans (foldl_heapFoldMinPick_le_init (heapFoldMinPick init y) ys)
+          (heapFoldMinPick_le_it init y)
+      · exact ih (heapFoldMinPick init y) vertex (List.mem_cons.mpr (Or.inr hvYs))
+
+theorem heapPopMin_min_d {heap : List HeapItem} {item rest}
+    (h : heapPopMin heap = some (item, rest)) :
+    ∀ it ∈ heap, item.d ≤ it.d := by
+  unfold heapPopMin at h
+  match heap with
+  | [] => cases h
+  | x :: xs =>
+    simp only at h
+    cases h
+    rw [heapFoldMinPick_eq, List.foldl, heapFoldMinPick_self]
+    intro it hmem
+    exact foldl_heapFoldMinPick_min x xs it hmem
+
 private theorem foldl_heapPopMin_mem (x : HeapItem) :
     ∀ xs, List.foldl heapFoldMinPick x xs ∈ x :: xs := by
   intro xs
@@ -226,6 +299,23 @@ private theorem freshPop_dist_eq {dist : List Float} {item : HeapItem}
     (hle : dist[item.v]! ≤ item.d) (hfresh : distStale dist item = false) :
     item.d = dist[item.v]! :=
   float_le_antisymm (freshPop_dist_le dist item hfresh) hle
+
+/-- Fresh pop at `u` carries the minimum float key among remaining heap entries. -/
+theorem heapPopMin_fresh_min_dHat {vg : ValidRustGraph n g} {s : Fin n} {dist : List Float}
+    {dHat : DistEstimate n} {heap : List HeapItem}
+    (hSim : SimInv vg s dist dHat) (hHeap : HeapStateInv (vg := vg) dist heap)
+    {item rest} (hpop : heapPopMin heap = some (item, rest)) (u : Fin n)
+    (hu : item.v = u.val) (hfresh : distStale dist item = false) :
+    ∀ it ∈ rest, nnrealToFloat (dHat u) ≤ it.d := by
+  intro it hmem
+  have hmem' := heapPopMin_rest_mem hpop hmem
+  have hmin := heapPopMin_min_d hpop it hmem'
+  have hitem := freshPop_dist_eq (hHeap.le item (heapPopMin_some_mem hpop)) hfresh
+  rw [hu] at hitem
+  calc
+    nnrealToFloat (dHat u) = dist[u.val]! := (hSim.aligned u).symm
+    _ = item.d := hitem.symm
+    _ ≤ it.d := hmin
 
 theorem heapStateInv_init {vg : ValidRustGraph n g} (s : Fin n) :
     HeapStateInv (vg := vg) (initDist g s.val) [⟨0.0, s.val⟩] where
@@ -419,43 +509,118 @@ theorem dijkstraStep_simInv_stale {vg : ValidRustGraph n g} (s : Fin n) (dist : 
   rw [dijkstraStep_stale_dist dist heap item rest hpop hstale]
   exact h
 
-theorem dijkstraStep_preserves_simInv {vg : ValidRustGraph n g} (s : Fin n) (dist : List Float)
+/-! ### Tracked `DistEstimate` through heap steps -/
+
+/-- The `DistEstimate` advanced by one heap step (unchanged on none/stale pop). -/
+noncomputable def dijkstraStep_dHat (vg : ValidRustGraph n g) (dist : List Float)
+    (dHat : DistEstimate n) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) :
+    DistEstimate n :=
+  match hpop : heapPopMin heap with
+  | none => dHat
+  | some (item, _) =>
+    if distStale dist item then dHat else
+      let u : Fin n := ⟨item.v, vg.hn ▸ hHeap.valid item (heapPopMin_some_mem hpop)⟩
+      relaxOutEdges vg.toGraph dHat u
+
+theorem dijkstraStep_dHat_none (vg : ValidRustGraph n g) (dist : List Float)
+    (dHat : DistEstimate n) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap)
+    (hpop : heapPopMin heap = none) :
+    dijkstraStep_dHat vg dist dHat heap hHeap = dHat := by
+  cases heap with
+  | nil =>
+    cases hpop
+    simp [dijkstraStep_dHat, heapPopMin]
+  | cons x xs =>
+    unfold heapPopMin at hpop
+    simp at hpop
+
+theorem dijkstraStep_dHat_stale (vg : ValidRustGraph n g) (dist : List Float)
+    (dHat : DistEstimate n) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap)
+    (item : HeapItem) (rest : List HeapItem) (hpop : heapPopMin heap = some (item, rest))
+    (hstale : distStale dist item = true) :
+    dijkstraStep_dHat vg dist dHat heap hHeap = dHat := by
+  cases heap with
+  | nil =>
+    unfold heapPopMin at hpop
+    simp at hpop
+  | cons x xs =>
+    cases hpop
+    simp only [dijkstraStep_dHat, heapPopMin, hstale, ↓reduceIte]
+
+theorem dijkstraStep_dHat_fresh (vg : ValidRustGraph n g) (dist : List Float)
+    (dHat : DistEstimate n) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap)
+    (item : HeapItem) (rest : List HeapItem) (u : Fin n) (hitemv : item.v = u.val)
+    (hpop : heapPopMin heap = some (item, rest)) (hstale : distStale dist item = false) :
+    dijkstraStep_dHat vg dist dHat heap hHeap = relaxOutEdges vg.toGraph dHat u := by
+  cases heap with
+  | nil =>
+    unfold heapPopMin at hpop
+    simp at hpop
+  | cons x xs =>
+    cases hpop
+    simp only [dijkstraStep_dHat, heapPopMin, hitemv]
+    rw [if_neg (Bool.eq_false_iff.mp hstale)]
+
+theorem dijkstraStep_simInv_exact {vg : ValidRustGraph n g} (s : Fin n) (dist : List Float)
     (dHat : DistEstimate n) (heap : List HeapItem) (h : SimInv vg s dist dHat)
     (hHeap : HeapStateInv (vg := vg) dist heap) :
-    ∃ dHat', SimInv vg s (dijkstraStep g dist heap).1 dHat' := by
-  by_cases hpop : heapPopMin heap = none
-  · rw [dijkstraStep_none dist heap hpop]
-    exact ⟨dHat, h⟩
-  · obtain ⟨item, rest, hpop'⟩ : ∃ item rest, heapPopMin heap = some (item, rest) := by
-      cases h : heapPopMin heap with
-      | none => exact absurd h hpop
-      | some p => exact ⟨p.1, p.2, rfl⟩
-    cases hstale : distStale dist item with
-    | false =>
-      have hpop : heapPopMin heap = some (item, rest) := hpop'
+    SimInv vg s (dijkstraStep g dist heap).1 (dijkstraStep_dHat vg dist dHat heap hHeap) := by
+  rcases hpop : heapPopMin heap with ⟨⟩ | ⟨item, rest⟩
+  · rw [dijkstraStep_none dist heap hpop, dijkstraStep_dHat_none vg dist dHat heap hHeap hpop]
+    exact h
+  · by_cases hstale : distStale dist item
+    · have hstale' : distStale dist item = true := by simp [hstale]
+      rw [dijkstraStep_dHat_stale vg dist dHat heap hHeap item rest hpop hstale']
+      exact dijkstraStep_simInv_stale (vg := vg) s dist dHat heap item rest hpop hstale' h
+    · have hstale' : distStale dist item = false := by simp [hstale]
       have hmem := heapPopMin_some_mem hpop
       let u : Fin n := ⟨item.v, vg.hn ▸ hHeap.valid item hmem⟩
       have hitemv : item.v = u.val := rfl
-      exact ⟨relaxOutEdges vg.toGraph dHat u,
-        dijkstraStep_simInv_fresh (vg := vg) s dist dHat heap item rest u hpop hstale hitemv
-          (hHeap.le item hmem) h⟩
-    | true =>
-      have hpop : heapPopMin heap = some (item, rest) := hpop'
-      exact ⟨dHat, dijkstraStep_simInv_stale (vg := vg) s dist dHat heap item rest hpop hstale h⟩
+      have hitem := freshPop_dist_eq (hHeap.le item hmem) hstale'
+      rw [dijkstraStep_dHat_fresh vg dist dHat heap hHeap item rest u hitemv hpop hstale']
+      exact dijkstraStep_simInv_fresh (vg := vg) s dist dHat heap item rest u hpop hstale' hitemv
+        (hHeap.le item hmem) h
+
+noncomputable def dijkstraRun_dHat (vg : ValidRustGraph n g) (dist : List Float)
+    (dHat : DistEstimate n) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) :
+    Nat → DistEstimate n
+  | 0 => dHat
+  | fuel + 1 =>
+    dijkstraRun_dHat vg (dijkstraStep g dist heap).1
+      (dijkstraStep_dHat vg dist dHat heap hHeap)
+      (dijkstraStep g dist heap).2
+      (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap) fuel
+
+theorem dijkstraRun_simInv_exact {vg : ValidRustGraph n g} (s : Fin n) (fuel : Nat)
+    (dist : List Float) (dHat : DistEstimate n) (heap : List HeapItem)
+    (h : SimInv vg s dist dHat) (hHeap : HeapStateInv (vg := vg) dist heap) :
+    SimInv vg s (dijkstraRun fuel g dist heap).1
+      (dijkstraRun_dHat vg dist dHat heap hHeap fuel) := by
+  induction fuel generalizing dist dHat heap h hHeap with
+  | zero =>
+    rw [dijkstraRun_zero]
+    exact h
+  | succ fuel ih =>
+    rw [dijkstraRun_succ]
+    have hSim' := dijkstraStep_simInv_exact (vg := vg) s dist dHat heap h hHeap
+    have hHeap' := dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap
+    dsimp [dijkstraRun_dHat]
+    exact ih (dijkstraStep g dist heap).1 (dijkstraStep_dHat vg dist dHat heap hHeap)
+      (dijkstraStep g dist heap).2 hSim' hHeap'
+
+theorem dijkstraStep_preserves_simInv {vg : ValidRustGraph n g} (s : Fin n) (dist : List Float)
+    (dHat : DistEstimate n) (heap : List HeapItem) (h : SimInv vg s dist dHat)
+    (hHeap : HeapStateInv (vg := vg) dist heap) :
+    ∃ dHat', SimInv vg s (dijkstraStep g dist heap).1 dHat' :=
+  ⟨dijkstraStep_dHat vg dist dHat heap hHeap,
+    dijkstraStep_simInv_exact (vg := vg) s dist dHat heap h hHeap⟩
 
 theorem dijkstraRun_preserves_simInv {vg : ValidRustGraph n g} (s : Fin n) (fuel : Nat)
     (dist : List Float) (dHat : DistEstimate n) (heap : List HeapItem)
     (h : SimInv vg s dist dHat) (hHeap : HeapStateInv (vg := vg) dist heap) :
-    ∃ dHat', SimInv vg s (dijkstraRun fuel g dist heap).1 dHat' := by
-  induction fuel generalizing dist dHat heap h hHeap with
-  | zero =>
-    rw [dijkstraRun_zero]
-    exact ⟨dHat, h⟩
-  | succ fuel ih =>
-    rw [dijkstraRun_succ]
-    obtain ⟨dHat', hSim'⟩ := dijkstraStep_preserves_simInv (vg := vg) s dist dHat heap h hHeap
-    have hHeap' := dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap
-    exact ih (dijkstraStep g dist heap).1 dHat' (dijkstraStep g dist heap).2 hSim' hHeap'
+    ∃ dHat', SimInv vg s (dijkstraRun fuel g dist heap).1 dHat' :=
+  ⟨dijkstraRun_dHat vg dist dHat heap hHeap fuel,
+    dijkstraRun_simInv_exact (vg := vg) s fuel dist dHat heap h hHeap⟩
 
 theorem dijkstraInit_simInv {vg : ValidRustGraph n g} (s : Fin n) :
     SimInv vg s (initDist g s.val) (initEstimate s) ∧
@@ -476,6 +641,507 @@ theorem dijkstraRun_init_simInv {vg : ValidRustGraph n g} (s : Fin n) (fuel : Na
   obtain ⟨hSim, hHeap⟩ := dijkstraInit_simInv (vg := vg) s
   exact dijkstraRun_preserves_simInv (vg := vg) s fuel (initDist g s.val) (initEstimate s)
     [⟨0.0, s.val⟩] hSim hHeap
+
+/-! ### `dHat` monotonicity through heap steps (estimates never increase) -/
+
+/-- Sound plus an upper bound on `dHat` yields completeness. -/
+theorem isComplete_of_sound_and_upper {G : Graph n} {s : Fin n} {dHat : DistEstimate n}
+    (hSound : Sound G s dHat) (hUpper : ∀ v, dHat v ≤ trueDist G s v) (v : Fin n) :
+    IsComplete G s dHat v := by
+  dsimp [IsComplete]
+  exact le_antisymm (hUpper v) (hSound v)
+
+private theorem dijkstraStep_dHat_preserves_zero_at_source {vg : ValidRustGraph n g} {s : Fin n}
+    (dist : List Float) (dHat : DistEstimate n) (heap : List HeapItem)
+    (hHeap : HeapStateInv (vg := vg) dist heap) (h : dHat s = 0) :
+    (dijkstraStep_dHat vg dist dHat heap hHeap) s = 0 := by
+  rcases hpop : heapPopMin heap with ⟨⟩ | ⟨item, rest⟩
+  · rw [dijkstraStep_dHat_none (vg := vg) dist dHat heap hHeap hpop]
+    exact h
+  · by_cases hstale : distStale dist item
+    · have hstale' : distStale dist item = true := by simp [hstale]
+      rw [dijkstraStep_dHat_stale (vg := vg) dist dHat heap hHeap item rest hpop hstale']
+      exact h
+    · have hmem := heapPopMin_some_mem hpop
+      let u : Fin n := ⟨item.v, vg.hn ▸ hHeap.valid item hmem⟩
+      have hstale' : distStale dist item = false := by simp [hstale]
+      rw [dijkstraStep_dHat_fresh (vg := vg) dist dHat heap hHeap item rest u rfl hpop hstale']
+      exact Algo.relaxOutEdges_preserves_zero_at_source (G := vg.toGraph) h
+
+theorem dijkstraRun_dHat_preserves_zero_at_source {vg : ValidRustGraph n g} {s : Fin n}
+    (dist : List Float) (dHat : DistEstimate n) (heap : List HeapItem)
+    (hHeap : HeapStateInv (vg := vg) dist heap) (fuel : Nat) (h : dHat s = 0) :
+    dijkstraRun_dHat vg dist dHat heap hHeap fuel s = 0 := by
+  induction fuel generalizing dist dHat heap hHeap with
+  | zero => exact h
+  | succ fuel ih =>
+    simp only [dijkstraRun_dHat]
+    exact ih (dijkstraStep g dist heap).1 (dijkstraStep_dHat vg dist dHat heap hHeap)
+      (dijkstraStep g dist heap).2 (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap)
+      (dijkstraStep_dHat_preserves_zero_at_source (vg := vg) (s := s) dist dHat heap hHeap h)
+
+theorem dijkstraRun_dHat_source_eq {vg : ValidRustGraph n g} (s : Fin n) (fuel : Nat) :
+    dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) fuel s = 0 :=
+  dijkstraRun_dHat_preserves_zero_at_source (vg := vg) (s := s) (initDist g s.val)
+    (initEstimate s) [⟨0.0, s.val⟩] (heapStateInv_init (vg := vg) s) fuel (initEstimate_self s)
+
+/-! ### Settlement route (fresh min-pop ⇒ complete)
+
+    Target chain:
+    1. `heapPopMin_min_d` / `heapPopMin_fresh_min_dHat` — ✓ fresh pop has minimum key
+    2. `freshPop_isComplete_of_setComplete` — if processed vertices are complete and `u` is
+       fresh-popped, then `IsComplete` at `u` (shortest-path / min-key argument)
+       · `ProcessedEdgeUpper` + `freshPop_isComplete_of_processed_pred` cover the `y = u` case
+       · `y ≠ u` case needs heap membership + strict float comparison (open)
+    3. Track `dijkstraRun_processed` through steps; maintain `SetComplete` + `ProcessedEdgeUpper`
+       · `dijkstraRun_processed_card_le_fuel` — ✓ processed ⊆ fuel steps
+       · `dijkstraStep_freshVertex_some` — ✓ fresh pop exposes heap item
+       · `dijkstraStep_fresh/stale_processedEdgeUpper` — ✓ one-step edge-upper extension
+       · `dijkstraRun_processedAcc_processedEdgeUpper` — ✓ run induction (needs fresh completeness)
+    4. `dijkstraRun_freshCount_at_heapFuel ≥ n` — fuel bound from `dijkstraHeapFuel`
+    5. Close via `dijkstraRun_dHat_all_complete_of_le_relaxRound_n` or direct sandwich
+
+    Step 4 is the remaining hard part (stale pops burn fuel without growing processed). -/
+
+/-- True when the next heap pop is fresh (non-stale). -/
+def dijkstraStep_isFresh (dist : List Float) (heap : List HeapItem) : Bool :=
+  match heapPopMin heap with
+  | none => false
+  | some (item, _) => !distStale dist item
+
+/-- Count fresh (non-stale) heap pops in a `dijkstraRun`. -/
+noncomputable def dijkstraRun_freshCount (fuel : Nat) (g : RustGraph) (dist : List Float)
+    (heap : List HeapItem) : Nat :=
+  match fuel with
+  | 0 => 0
+  | fuel + 1 =>
+    let (d, h) := dijkstraStep g dist heap
+    dijkstraRun_freshCount fuel g d h + if dijkstraStep_isFresh dist heap then 1 else 0
+
+/-- If the step is a fresh pop, return the popped vertex; otherwise `none`. -/
+def dijkstraStep_freshVertex (vg : ValidRustGraph n g) (dist : List Float)
+    (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) : Option (Fin n) :=
+  match hpop : heapPopMin heap with
+  | none => none
+  | some (item, rest) =>
+    if distStale dist item then none
+    else some ⟨item.v, vg.hn ▸ hHeap.valid item (heapPopMin_some_mem hpop)⟩
+
+/-- Vertices that have received a fresh pop (past-only accumulator for settlement). -/
+noncomputable def dijkstraRun_processedAcc (vg : ValidRustGraph n g) (dist : List Float)
+    (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) (fuel : Nat)
+    (acc : Finset (Fin n)) : Finset (Fin n) :=
+  match fuel with
+  | 0 => acc
+  | fuel + 1 =>
+    match dijkstraStep_freshVertex vg dist heap hHeap with
+    | none =>
+      dijkstraRun_processedAcc vg (dijkstraStep g dist heap).1 (dijkstraStep g dist heap).2
+        (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap) fuel acc
+    | some u =>
+      dijkstraRun_processedAcc vg (dijkstraStep g dist heap).1 (dijkstraStep g dist heap).2
+        (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap) fuel (insert u acc)
+
+noncomputable def dijkstraRun_processed (vg : ValidRustGraph n g) (dist : List Float)
+    (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) (fuel : Nat) :
+    Finset (Fin n) :=
+  dijkstraRun_processedAcc vg dist heap hHeap fuel ∅
+
+/-- For every processed vertex `x`, current estimates respect edge-upper bounds from `x`
+    using `x`'s true distance (requires `x` complete when the edge was relaxed). -/
+def ProcessedEdgeUpper {G : Graph n} (s : Fin n) (dHat : DistEstimate n) (S : Finset (Fin n)) :
+    Prop :=
+  ∀ x ∈ S, ∀ (y : Fin n) (w : NNReal), w ∈ G.edges x y → dHat y ≤ trueDist G s x + w
+
+theorem processedEdgeUpper_empty {G : Graph n} (s : Fin n) (dHat : DistEstimate n) :
+    ProcessedEdgeUpper (G := G) s dHat ∅ := by
+  intro x hx
+  simp at hx
+
+theorem relaxOutEdges_tgt_le_trueDist_add_of_complete {G : Graph n} {s x y : Fin n}
+    {dHat : DistEstimate n} (hComplete : IsComplete G s dHat x) (wt : NNReal)
+    (h : wt ∈ G.edges x y) :
+    (relaxOutEdges G dHat x) y ≤ trueDist G s x + (wt : WithTop NNReal) := by
+  calc
+    (relaxOutEdges G dHat x) y ≤ dHat x + (wt : WithTop NNReal) :=
+      Algo.relaxOutEdges_le_add_edge (G := G) dHat x y wt h
+    _ = trueDist G s x + (wt : WithTop NNReal) := by rw [hComplete]
+
+/-- Fresh pop is complete when a processed predecessor already tightened the incoming edge
+    on a shortest walk (the `y = u` case of the settlement argument). -/
+theorem freshPop_isComplete_of_processed_pred {G : Graph n} {s : Fin n} {dHat : DistEstimate n}
+    (S : Finset (Fin n)) (u x : Fin n) (wt : NNReal) (_hSet : SetComplete G s dHat S)
+    (_hu : u ∉ S) (_hx : x ∈ S) (hSound : Sound G s dHat) (_hEdge : wt ∈ G.edges x u)
+    (hPred : dHat u ≤ trueDist G s x + (wt : WithTop NNReal))
+    (hWalk : trueDist G s u = trueDist G s x + (wt : WithTop NNReal)) :
+    IsComplete G s dHat u := by
+  dsimp [IsComplete]
+  exact le_antisymm (hWalk ▸ hPred) (hSound u)
+
+theorem dijkstraRun_freshCount_le_fuel (fuel : Nat) (dist : List Float) (heap : List HeapItem) :
+    dijkstraRun_freshCount fuel g dist heap ≤ fuel := by
+  induction fuel generalizing dist heap with
+  | zero => simp [dijkstraRun_freshCount]
+  | succ fuel ih =>
+    simp only [dijkstraRun_freshCount]
+    have h := ih (dijkstraStep g dist heap).1 (dijkstraStep g dist heap).2
+    split <;> omega
+
+theorem dijkstraRun_processedAcc_card_le_acc_add_fuel {vg : ValidRustGraph n g} (dist : List Float)
+    (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) (fuel : Nat)
+    (acc : Finset (Fin n)) :
+    (dijkstraRun_processedAcc vg dist heap hHeap fuel acc).card ≤ acc.card + fuel := by
+  induction fuel generalizing dist heap hHeap acc with
+  | zero => simp [dijkstraRun_processedAcc]
+  | succ fuel ih =>
+    cases hf : dijkstraStep_freshVertex vg dist heap hHeap with
+    | none =>
+      simp only [dijkstraRun_processedAcc, hf]
+      exact Nat.le_trans (ih (dijkstraStep g dist heap).1 (dijkstraStep g dist heap).2
+        (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap) acc) (Nat.le_add_right _ 1)
+    | some u =>
+      simp only [dijkstraRun_processedAcc, hf]
+      refine Nat.le_trans (ih (dijkstraStep g dist heap).1 (dijkstraStep g dist heap).2
+        (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap) (insert u acc)) ?_
+      have hcard := Finset.card_insert_le u acc
+      omega
+
+theorem dijkstraRun_processed_card_le_fuel {vg : ValidRustGraph n g} (dist : List Float)
+    (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) (fuel : Nat) :
+    (dijkstraRun_processed vg dist heap hHeap fuel).card ≤ fuel := by
+  simpa [dijkstraRun_processed] using
+    dijkstraRun_processedAcc_card_le_acc_add_fuel (vg := vg) dist heap hHeap fuel ∅
+
+/-- Reduce heap-side completeness to edge-upper bounds once `dHat s = 0`. -/
+theorem dijkstraStep_freshVertex_some {vg : ValidRustGraph n g} (dist : List Float)
+    (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap) (u : Fin n)
+    (h : dijkstraStep_freshVertex vg dist heap hHeap = some u) :
+    ∃ item rest, heapPopMin heap = some (item, rest) ∧ distStale dist item = false ∧ u.val = item.v := by
+  rcases hpop : heapPopMin heap with ⟨⟩ | ⟨item, rest⟩
+  · have hn : dijkstraStep_freshVertex vg dist heap hHeap = none := by
+      cases heap with
+      | nil => simp [dijkstraStep_freshVertex, heapPopMin, hpop]
+      | cons x xs => simp [heapPopMin] at hpop
+    exact absurd (h.symm.trans hn) (Option.some_ne_none u)
+  · by_cases hstale : distStale dist item
+    · have hn : dijkstraStep_freshVertex vg dist heap hHeap = none := by
+        cases heap with
+        | nil =>
+          unfold heapPopMin at hpop
+          simp at hpop
+        | cons x xs =>
+          cases hpop
+          simp only [dijkstraStep_freshVertex, heapPopMin, hstale, ↓reduceIte]
+      exact absurd (h.symm.trans hn) (Option.some_ne_none u)
+    · have hstale' : distStale dist item = false := by simp [hstale]
+      have hfresh : dijkstraStep_freshVertex vg dist heap hHeap =
+          some ⟨item.v, vg.hn ▸ hHeap.valid item (heapPopMin_some_mem hpop)⟩ := by
+        cases heap with
+        | nil =>
+          unfold heapPopMin at hpop
+          simp at hpop
+        | cons x xs =>
+          cases hpop
+          simp only [dijkstraStep_freshVertex, heapPopMin, ↓reduceIte]
+          rw [if_neg (Bool.eq_false_iff.mp hstale')]
+      have hu : u = ⟨item.v, vg.hn ▸ hHeap.valid item (heapPopMin_some_mem hpop)⟩ :=
+        Option.some_inj.mp (h.symm.trans hfresh)
+      refine ⟨item, rest, ?_, hstale', congrArg Fin.val hu⟩
+      exact rfl
+
+/-- Reduce heap-side completeness to edge-upper bounds once `dHat s = 0`. -/
+theorem dijkstraRun_dHat_all_complete_of_edgeUpper {vg : ValidRustGraph n g} (s : Fin n)
+    (fuel : Nat) (hEdge : EdgeUpper vg.toGraph s
+      (dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) fuel)) :
+    ∀ v : Fin n,
+      IsComplete vg.toGraph s
+        (dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+          (heapStateInv_init (vg := vg) s) fuel) v := by
+  intro v
+  let dHat := dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+    (heapStateInv_init (vg := vg) s) fuel
+  obtain ⟨hSim, hHeap⟩ := dijkstraInit_simInv (vg := vg) s
+  have hSound : Sound vg.toGraph s dHat :=
+    (dijkstraRun_simInv_exact (vg := vg) s fuel (initDist g s.val) (initEstimate s)
+      [⟨0.0, s.val⟩] hSim hHeap).sound
+  exact isComplete_of_sound_and_edgeUpper (G := vg.toGraph) (s := s) (dHat := dHat)
+    (dijkstraRun_dHat_source_eq (vg := vg) s fuel) hSound hEdge v
+
+theorem dijkstraRun_dHat_ge_trueDist {vg : ValidRustGraph n g} (s : Fin n) (fuel : Nat)
+    (v : Fin n) :
+    trueDist vg.toGraph s v ≤
+      dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) fuel v := by
+  obtain ⟨hSim, hHeap⟩ := dijkstraInit_simInv (vg := vg) s
+  exact (dijkstraRun_simInv_exact (vg := vg) s fuel (initDist g s.val) (initEstimate s)
+    [⟨0.0, s.val⟩] hSim hHeap).sound v
+
+/-- Reduce heap-side completeness to a pointwise upper bound against `relaxRound n init`. -/
+theorem dijkstraRun_dHat_all_complete_of_le_relaxRound_n {vg : ValidRustGraph n g} (s : Fin n)
+    (fuel : Nat)
+    (hUpper :
+      ∀ v : Fin n,
+        dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+          (heapStateInv_init (vg := vg) s) fuel v ≤
+          Algo.relaxRound vg.toGraph n (initEstimate s) v) :
+    ∀ v : Fin n,
+      IsComplete vg.toGraph s
+        (dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+          (heapStateInv_init (vg := vg) s) fuel) v := by
+  intro v
+  refine isComplete_of_sound_and_upper (G := vg.toGraph) (s := s) (v := v) ?_ ?_
+  · intro w
+    exact dijkstraRun_dHat_ge_trueDist (vg := vg) s fuel w
+  · intro w
+    rw [← dijkstraSpec_correct, ← Algo.dijkstra_correct (G := vg.toGraph) (s := s) (v := w)]
+    exact hUpper w
+
+theorem dijkstraStep_dHat_le {vg : ValidRustGraph n g} (dist : List Float)
+    (dHat : DistEstimate n) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap)
+    (v : Fin n) : dijkstraStep_dHat vg dist dHat heap hHeap v ≤ dHat v := by
+  rcases hpop : heapPopMin heap with ⟨⟩ | ⟨item, rest⟩
+  · exact le_of_eq (congrFun (dijkstraStep_dHat_none (vg := vg) dist dHat heap hHeap hpop) v)
+  · by_cases hstale : distStale dist item
+    · have hstale' : distStale dist item = true := by simp [hstale]
+      exact le_of_eq (congrFun (dijkstraStep_dHat_stale (vg := vg) dist dHat heap hHeap item rest hpop hstale') v)
+    · have hstale' : distStale dist item = false := by simp [hstale]
+      have hmem := heapPopMin_some_mem hpop
+      let u : Fin n := ⟨item.v, vg.hn ▸ hHeap.valid item hmem⟩
+      rw [dijkstraStep_dHat_fresh (vg := vg) dist dHat heap hHeap item rest u rfl hpop hstale']
+      exact Algo.le_relaxOutEdges (G := vg.toGraph) (dHat := dHat) (u := u) (v := v)
+
+/-- After a fresh pop, `ProcessedEdgeUpper` extends to the newly processed complete vertex. -/
+theorem dijkstraStep_fresh_processedEdgeUpper {vg : ValidRustGraph n g} {s : Fin n}
+    (dist : List Float) (dHat : DistEstimate n) (heap : List HeapItem)
+    (hHeap : HeapStateInv (vg := vg) dist heap) (acc : Finset (Fin n)) (uPop : Fin n)
+    (hFresh : dijkstraStep_freshVertex vg dist heap hHeap = some uPop)
+    (hEdge : ProcessedEdgeUpper (G := vg.toGraph) s dHat acc)
+    (hComplete : IsComplete vg.toGraph s dHat uPop) :
+    ProcessedEdgeUpper (G := vg.toGraph) s (dijkstraStep_dHat vg dist dHat heap hHeap) (insert uPop acc) := by
+  intro z hz y w hwt
+  rcases Finset.mem_insert.mp hz with hzEq | hz
+  · rw [hzEq]
+    rw [hzEq] at hwt
+    obtain ⟨item, rest, hpop, hstale, hitemv⟩ :=
+      dijkstraStep_freshVertex_some (vg := vg) dist heap hHeap uPop hFresh
+    have hitemv' : item.v = uPop.val := hitemv.symm
+    have hnotStale : distStale dist item = false := by simp [hstale]
+    rw [dijkstraStep_dHat_fresh (vg := vg) dist dHat heap hHeap item rest uPop hitemv' hpop hnotStale]
+    calc
+      (relaxOutEdges vg.toGraph dHat uPop) y ≤ dHat uPop + (w : WithTop NNReal) :=
+        Algo.relaxOutEdges_le_add_edge (G := vg.toGraph) dHat uPop y w hwt
+      _ = trueDist vg.toGraph s uPop + (w : WithTop NNReal) := by rw [hComplete]
+  · exact (dijkstraStep_dHat_le (vg := vg) dist dHat heap hHeap y).trans (hEdge z hz y w hwt)
+
+/-- After a non-fresh heap step, `ProcessedEdgeUpper` on the past accumulator is preserved. -/
+theorem dijkstraStep_stale_processedEdgeUpper {vg : ValidRustGraph n g} {s : Fin n}
+    (dist : List Float) (dHat : DistEstimate n) (heap : List HeapItem)
+    (hHeap : HeapStateInv (vg := vg) dist heap) (acc : Finset (Fin n))
+    (_hFresh : dijkstraStep_freshVertex vg dist heap hHeap = none)
+    (hEdge : ProcessedEdgeUpper (G := vg.toGraph) s dHat acc) :
+    ProcessedEdgeUpper (G := vg.toGraph) s (dijkstraStep_dHat vg dist dHat heap hHeap) acc := by
+  intro x hx y w hwt
+  exact (dijkstraStep_dHat_le (vg := vg) dist dHat heap hHeap y).trans (hEdge x hx y w hwt)
+
+/-- If every fresh pop is complete w.r.t. the current estimate, `ProcessedEdgeUpper` is preserved
+    on the past-only processed accumulator through a heap run. -/
+theorem dijkstraRun_processedAcc_processedEdgeUpper {vg : ValidRustGraph n g} {s : Fin n}
+    (dist : List Float) (dHat : DistEstimate n) (heap : List HeapItem)
+    (hHeap : HeapStateInv (vg := vg) dist heap) (fuel : Nat) (acc : Finset (Fin n))
+    (hEdge : ProcessedEdgeUpper (G := vg.toGraph) s dHat acc)
+    (hFreshComplete :
+      ∀ (dist' : List Float) (dHat' : DistEstimate n) (heap' : List HeapItem)
+        (hHeap' : HeapStateInv (vg := vg) dist' heap') (acc' : Finset (Fin n)) (uPop : Fin n),
+        dijkstraStep_freshVertex vg dist' heap' hHeap' = some uPop →
+        ProcessedEdgeUpper (G := vg.toGraph) s dHat' acc' →
+        IsComplete vg.toGraph s dHat' uPop) :
+    ProcessedEdgeUpper (G := vg.toGraph) s
+      (dijkstraRun_dHat vg dist dHat heap hHeap fuel)
+      (dijkstraRun_processedAcc vg dist heap hHeap fuel acc) := by
+  induction fuel generalizing dist dHat heap hHeap acc hEdge with
+  | zero =>
+    simp [dijkstraRun_processedAcc, dijkstraRun_dHat]
+    exact hEdge
+  | succ fuel ih =>
+    cases hf : dijkstraStep_freshVertex vg dist heap hHeap with
+    | none =>
+      simp only [dijkstraRun_processedAcc, dijkstraRun_dHat, hf]
+      exact ih (dijkstraStep g dist heap).1 (dijkstraStep_dHat vg dist dHat heap hHeap)
+        (dijkstraStep g dist heap).2 (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap) acc
+        (dijkstraStep_stale_processedEdgeUpper (vg := vg) (s := s) dist dHat heap hHeap acc hf hEdge)
+    | some uPop =>
+      simp only [dijkstraRun_processedAcc, dijkstraRun_dHat, hf]
+      have hComplete := hFreshComplete dist dHat heap hHeap acc uPop hf hEdge
+      exact ih (dijkstraStep g dist heap).1 (dijkstraStep_dHat vg dist dHat heap hHeap)
+        (dijkstraStep g dist heap).2 (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap)
+        (insert uPop acc)
+        (dijkstraStep_fresh_processedEdgeUpper (vg := vg) (s := s) dist dHat heap hHeap acc uPop hf
+          hEdge hComplete)
+
+theorem dijkstraRun_processed_processedEdgeUpper {vg : ValidRustGraph n g} {s : Fin n}
+    (fuel : Nat)
+    (hFreshComplete :
+      ∀ (dist : List Float) (dHat : DistEstimate n) (heap : List HeapItem)
+        (hHeap : HeapStateInv (vg := vg) dist heap) (acc : Finset (Fin n)) (uPop : Fin n),
+        dijkstraStep_freshVertex vg dist heap hHeap = some uPop →
+        ProcessedEdgeUpper (G := vg.toGraph) s dHat acc →
+        IsComplete vg.toGraph s dHat uPop) :
+    ProcessedEdgeUpper (G := vg.toGraph) s
+      (dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) fuel)
+      (dijkstraRun_processed vg (initDist g s.val) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) fuel) := by
+  simpa [dijkstraRun_processed] using
+    dijkstraRun_processedAcc_processedEdgeUpper (vg := vg) (s := s) (initDist g s.val)
+      (initEstimate s) [⟨0.0, s.val⟩] (heapStateInv_init (vg := vg) s) fuel ∅
+      (processedEdgeUpper_empty (G := vg.toGraph) s (initEstimate s)) hFreshComplete
+
+theorem dijkstraRun_dHat_mono {vg : ValidRustGraph n g} (dist : List Float)
+    (dHat : DistEstimate n) (heap : List HeapItem) (hHeap : HeapStateInv (vg := vg) dist heap)
+    (fuel : Nat) (v : Fin n) :
+    dijkstraRun_dHat vg dist dHat heap hHeap (fuel + 1) v ≤
+      dijkstraRun_dHat vg dist dHat heap hHeap fuel v := by
+  induction fuel generalizing dist dHat heap hHeap with
+  | zero =>
+    simp [dijkstraRun_dHat]
+    exact dijkstraStep_dHat_le (vg := vg) dist dHat heap hHeap v
+  | succ fuel ih =>
+    simp only [dijkstraRun_dHat]
+    exact ih (dijkstraStep g dist heap).1 (dijkstraStep_dHat vg dist dHat heap hHeap)
+      (dijkstraStep g dist heap).2 (dijkstraStep_preserves_heapInv (vg := vg) dist heap hHeap)
+
+/-- Equal `DistEstimate`s when every vertex is complete on both. -/
+theorem dHat_eq_of_all_IsComplete {G : Graph n} {s : Fin n}
+    {dHat1 dHat2 : DistEstimate n}
+    (h1 : ∀ v, IsComplete G s dHat1 v) (h2 : ∀ v, IsComplete G s dHat2 v) :
+    dHat1 = dHat2 := by
+  ext v
+  rw [h1 v, h2 v]
+
+theorem dijkstraRun_dist_sound {vg : ValidRustGraph n g} (s : Fin n) (fuel : Nat) :
+    DistSound vg.toGraph s (dijkstraRun fuel g (initDist g s.val) [⟨0.0, s.val⟩]).1 := by
+  constructor
+  · obtain ⟨hSim, hHeap⟩ := dijkstraInit_simInv (vg := vg) s
+    have hSim' := dijkstraRun_simInv_exact (vg := vg) s fuel (initDist g s.val) (initEstimate s)
+      [⟨0.0, s.val⟩] hSim hHeap
+    exact hSim'.len
+  · intro v
+    obtain ⟨hSim, hHeap⟩ := dijkstraInit_simInv (vg := vg) s
+    have hSim' := dijkstraRun_simInv_exact (vg := vg) s fuel (initDist g s.val) (initEstimate s)
+      [⟨0.0, s.val⟩] hSim hHeap
+    rw [hSim'.aligned v]
+    exact nnrealToFloat_monotone (hSim'.sound v)
+
+/-- When the heap-side tracked estimate is complete everywhere, it equals verified `dijkstra`. -/
+theorem dijkstraRun_dHat_eq_dijkstra_of_all_complete {vg : ValidRustGraph n g} (s : Fin n)
+    (fuel : Nat)
+    (hComplete :
+      ∀ v : Fin n,
+        IsComplete vg.toGraph s
+          (dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+            (heapStateInv_init (vg := vg) s) fuel) v) :
+    dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) fuel = Algo.dijkstra vg.toGraph s := by
+  ext v
+  rw [hComplete v, Algo.dijkstra_correct (G := vg.toGraph) (s := s) (v := v), dijkstraSpec_correct]
+
+/-- Distance lists agree when the heap-side estimate is complete at both fuels. -/
+theorem dijkstraRun_eq_floatRelaxRound_of_heap_complete {vg : ValidRustGraph n g} (s : Fin n)
+    (heapFuel relaxFuel : Nat) (hRelaxFuel : relaxFuel = n)
+    (hHeapComplete :
+      ∀ v : Fin n,
+        IsComplete vg.toGraph s
+          (dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+            (heapStateInv_init (vg := vg) s) heapFuel) v) :
+    (dijkstraRun heapFuel g (initDist g s.val) [⟨0.0, s.val⟩]).1 =
+      floatRelaxRound relaxFuel g (initDist g s.val) := by
+  obtain ⟨hSim, hHeap⟩ := dijkstraInit_simInv (vg := vg) s
+  apply dist_eq_of_simInv_both_complete
+  · exact dijkstraRun_simInv_exact (vg := vg) s heapFuel (initDist g s.val) (initEstimate s)
+      [⟨0.0, s.val⟩] hSim hHeap
+  · exact floatRelaxRound_simInv (vg := vg) s relaxFuel (initDist g s.val) (initEstimate s) hSim
+  · exact hHeapComplete
+  · intro v
+    subst hRelaxFuel
+    exact relaxRound_n_all_complete vg.toGraph s v
+
+/-- Schedule alignment at `dijkstraHeapFuel`, assuming heap-side completeness. -/
+theorem dijkstraRun_dHat_schedule_of_all_complete {vg : ValidRustGraph n g} (s : Fin n)
+    (hComplete :
+      ∀ v : Fin n,
+        IsComplete vg.toGraph s
+          (dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+            (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g)) v) :
+    dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) =
+      relaxRound vg.toGraph n (initEstimate s) := by
+  apply dHat_eq_of_all_IsComplete
+  · exact hComplete
+  · intro v
+    exact relaxRound_n_all_complete vg.toGraph s v
+
+/-- Schedule alignment from the upper-bound completeness reduction. -/
+theorem dijkstraRun_dHat_schedule_of_upper {vg : ValidRustGraph n g} (s : Fin n)
+    (hUpper :
+      ∀ v : Fin n,
+        dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+          (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) v ≤
+          Algo.relaxRound vg.toGraph n (initEstimate s) v) :
+    dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) =
+      relaxRound vg.toGraph n (initEstimate s) :=
+  dijkstraRun_dHat_schedule_of_all_complete (vg := vg) s
+    (dijkstraRun_dHat_all_complete_of_le_relaxRound_n (vg := vg) s (dijkstraHeapFuel g) hUpper)
+
+/-- Reduce schedule alignment to heap-side completeness at `dijkstraHeapFuel`.
+
+    **Open:** prove `dijkstraRun_dHat_all_complete_at_heapFuel` — e.g. via terminal
+    `EdgeUpper` (not preserved from `initEstimate`), or `dHat ≤ relaxRound n init`. Once
+    proved, use `dijkstraRun_dHat_schedule_of_all_complete`. -/
+theorem dijkstraRun_dHat_schedule (vg : ValidRustGraph n g) (s : Fin n)
+    (hComplete :
+      ∀ v : Fin n,
+        IsComplete vg.toGraph s
+          (dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+            (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g)) v) :
+    dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+      (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) =
+      relaxRound vg.toGraph n (initEstimate s) :=
+  dijkstraRun_dHat_schedule_of_all_complete (vg := vg) s hComplete
+
+/-- When heap and float schedules share a final `DistEstimate`, distance lists agree. -/
+theorem dijkstraRun_eq_floatRelaxRound {vg : ValidRustGraph n g} (s : Fin n)
+    (heapFuel relaxFuel : Nat)
+    (hSchedule :
+      dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) heapFuel =
+      relaxRound vg.toGraph relaxFuel (initEstimate s)) :
+    (dijkstraRun heapFuel g (initDist g s.val) [⟨0.0, s.val⟩]).1 =
+      floatRelaxRound relaxFuel g (initDist g s.val) := by
+  obtain ⟨hSim, hHeap⟩ := dijkstraInit_simInv (vg := vg) s
+  apply dist_eq_of_simInv_dHat_eq hSchedule
+  · exact dijkstraRun_simInv_exact (vg := vg) s heapFuel (initDist g s.val) (initEstimate s)
+      [⟨0.0, s.val⟩] hSim hHeap
+  · exact floatRelaxRound_simInv (vg := vg) s relaxFuel (initDist g s.val) (initEstimate s) hSim
+
+/-- Reduce `dijkstraHeap = dijkstraRelax` to schedule alignment at heap fuel vs `n` relax rounds. -/
+theorem dijkstraHeap_eq_dijkstraRelax_of_schedule {vg : ValidRustGraph n g} (s : Fin n)
+    (hSchedule :
+      dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) =
+      relaxRound vg.toGraph g.n (initEstimate s)) :
+    dijkstraHeap g s.val = dijkstraRelax g s.val := by
+  rw [dijkstraHeap_eq_dijkstraRun, dijkstraRelax]
+  have hSchedule' :
+      dijkstraRun_dHat vg (initDist g s.val) (initEstimate s) [⟨0.0, s.val⟩]
+        (heapStateInv_init (vg := vg) s) (dijkstraHeapFuel g) =
+      relaxRound vg.toGraph n (initEstimate s) := by
+    rw [vg.hn] at hSchedule
+    exact hSchedule
+  simpa [vg.hn] using
+    dijkstraRun_eq_floatRelaxRound (vg := vg) s (dijkstraHeapFuel g) n hSchedule'
 
 end Refine
 end Sssp

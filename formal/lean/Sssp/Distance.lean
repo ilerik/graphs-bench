@@ -290,11 +290,83 @@ theorem initEstimate_sound {n : ℕ} (G : Graph n) (s : Fin n) : Sound G s (init
   · rw [initEstimate_ne _ _ hv]
     exact le_top
 
+/-- Along any walk, edge-upper estimates grow by at most walk length from the walk start. -/
+theorem dHat_le_add_walk_length {n : ℕ} {G : Graph n} {dHat : DistEstimate n}
+    (hEdge : ∀ {u v : Fin n} {w : NNReal}, w ∈ G.edges u v → dHat v ≤ dHat u + w)
+    {src tgt : Fin n} (walk : Walk G src tgt) :
+    dHat tgt ≤ dHat src + (walk.length : WithTop NNReal) := by
+  have h : ∀ (src tgt : Fin n) (walk : Walk G src tgt) (fuel : Nat),
+      walk.numEdges = fuel → dHat tgt ≤ dHat src + (walk.length : WithTop NNReal) := by
+    intro src tgt walk fuel
+    induction fuel generalizing src tgt walk with
+    | zero =>
+      intro hfuel
+      rcases walk with ⟨steps, valid⟩
+      have hnil : steps = [] := by
+        cases steps with
+        | nil => rfl
+        | cons _ _ => simp [Walk.numEdges] at hfuel
+      subst hnil
+      cases valid with
+      | nil heq =>
+        subst heq
+        simp [Walk.length, add_zero]
+    | succ fuel ih =>
+      intro hfuel
+      have hn : 0 < walk.numEdges := by rw [hfuel]; exact Nat.succ_pos fuel
+      obtain ⟨v, w0, w', hsteps, h_edge⟩ := Walk.exists_first_step_tail (G := G) hn
+      have hfuel' : w'.numEdges = fuel := by
+        simp [Walk.numEdges, hsteps] at hfuel ⊢
+        omega
+      have hlen : (walk.length : WithTop NNReal) = (w0 : WithTop NNReal) + w'.length := by
+        simp [Walk.length, hsteps, List.sum_cons]
+      calc
+        dHat tgt ≤ dHat v + (w'.length : WithTop NNReal) := ih v tgt w' hfuel'
+        _ ≤ dHat src + (w0 : WithTop NNReal) + w'.length := by
+          gcongr
+          exact hEdge h_edge
+        _ = dHat src + ((w0 : WithTop NNReal) + w'.length) := by rw [add_assoc]
+        _ = dHat src + (walk.length : WithTop NNReal) := by rw [hlen]
+  exact h src tgt walk walk.numEdges rfl
+
+/-- Along any walk from `s`, edge-upper estimates are bounded by walk length. Requires `dHat s = 0`. -/
+theorem dHat_le_walk_length {n : ℕ} {G : Graph n} {s : Fin n} {dHat : DistEstimate n}
+    (hSource : dHat s = 0)
+    (hEdge : ∀ {u v : Fin n} {w : NNReal}, w ∈ G.edges u v → dHat v ≤ dHat u + w)
+    {t : Fin n} (w : Walk G s t) :
+    dHat t ≤ (w.length : WithTop NNReal) := by
+  have h := dHat_le_add_walk_length (G := G) (dHat := dHat) hEdge w
+  calc
+    dHat t ≤ dHat s + (w.length : WithTop NNReal) := h
+    _ = (w.length : WithTop NNReal) := by rw [hSource, zero_add]
+
+/-- Edge-upper estimates never exceed true distance. Requires `dHat s = 0`. -/
+theorem dHat_le_trueDist_of_edgeUpper {n : ℕ} {G : Graph n} {s : Fin n} {dHat : DistEstimate n}
+    (hSource : dHat s = 0)
+    (hEdge : ∀ {u v : Fin n} {w : NNReal}, w ∈ G.edges u v → dHat v ≤ dHat u + w) :
+    ∀ v, dHat v ≤ trueDist G s v := by
+  intro v
+  apply le_iInf
+  intro walk
+  exact dHat_le_walk_length (G := G) (s := s) hSource hEdge walk
+
 /-- A vertex `v` is **complete** w.r.t. `dHat` iff its current estimate
     equals its true distance. -/
 def IsComplete {n : ℕ} (G : Graph n) (s : Fin n)
     (dHat : DistEstimate n) (v : Fin n) : Prop :=
   dHat v = trueDist G s v
+
+/-- Every edge is tight-upper relative to `dHat` (a relaxation fixpoint condition). -/
+def EdgeUpper {n : ℕ} (G : Graph n) (_s : Fin n) (dHat : DistEstimate n) : Prop :=
+  (∀ {u v : Fin n} {w : NNReal}, w ∈ G.edges u v → dHat v ≤ dHat u + w)
+
+/-- `Sound` plus edge-upper bounds give completeness. Requires `dHat s = 0`. -/
+theorem isComplete_of_sound_and_edgeUpper {n : ℕ} {G : Graph n} {s : Fin n} {dHat : DistEstimate n}
+    (hSource : dHat s = 0) (hSound : Sound G s dHat) (hEdge : EdgeUpper G s dHat) (v : Fin n) :
+    IsComplete G s dHat v := by
+  dsimp [IsComplete]
+  exact le_antisymm (dHat_le_trueDist_of_edgeUpper (G := G) (s := s) hSource
+    (fun h => hEdge h) v) (hSound v)
 
 /-- A set `S` is **complete** iff every vertex in `S` is complete. -/
 def SetComplete {n : ℕ} (G : Graph n) (s : Fin n)
