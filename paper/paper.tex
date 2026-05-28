@@ -680,7 +680,7 @@ operations the Refine code calls; \code{distInf} in
 \code{f64::INFINITY}.
 
 On the non-negative orthant relevant to nat-cast edge weights
-(\code{floatWeight w = Float.ofNat w}), we rely on monotonicity and
+(\code{floatWeight w} $=$ \code{Float.ofNat w}), we rely on monotonicity and
 algebraic laws packaged as named axioms in \code{NumericBridge}
 (\cref{sec:refine}): addition is associative and commutative on the
 operands that arise, and \code{Float.le} is a total preorder compatible
@@ -1011,41 +1011,58 @@ future work. Every row reports \code{match=yes} (distances agree within
 $10^{-7}$ relative tolerance).
 
 % =====================================================================
-% =====================================================================
 \section{Discussion and future work}\label{sec:discussion}
 
-\todo{Outline:
-\begin{enumerate}[leftmargin=1.6em,itemsep=0.25em]
-  \item \textbf{Phase~3c: zero-axiom \Dijkstra.} Close the single remaining
-        \code{HeapBridge} lemma
-        \code{dijkstraRun\_dHat\_all\_complete\_at\_heapFuel}; document
-        \code{NumericBridge} as a stable IEEE-754 specification or, optionally,
-        port a fragment of \textsc{Flocq}~\cite{BoldoMelquiond2011Flocq} to
-        \Lean{} (RelaxBridge and GraphBridge are already discharged).
-  \item \textbf{Aeneas-driven extraction.} Replace the hand-translated
-        Refine layer with output from
-        \textsc{Aeneas}~\cite{HoProtzenko2022Aeneas,HoFromherzProtzenko2024Aeneas},
-        gaining a sound borrow-checker bridge from
-        Ho/Fromherz/Protzenko~\cite{HoFromherzProtzenko2024Aeneas}.
-  \item \textbf{Forward-error bound.} Prove a Higham-style
-        $(n-1)\cdot\mathrm{ulp}$ bound for the cumulative \code{f64} sum
-        along any shortest path~\cite{Higham2002Accuracy}, building on a
-        future \textsc{Flocq}-port for \Lean.
-  \item \textbf{Cost monad.} Build a runtime cost monad for \Lean{} on top
-        of \Mathlib's \code{Asymptotics.IsBigO}, in the spirit of
-        Charguéraud--Pottier time
-        credits~\cite{CharguraudPottier2015UnionFind,GueneauChargueraudPottier2018ESOP},
-        and recover the standard $(n+m)\log n$ \Dijkstra{} bound.
-  \item \textbf{Verifying \BMSSP.} Once Phase~3c is closed, instantiate the
-        same three-layer architecture for the new
-        $\Bigo(m\log^{2/3} n)$ algorithm of
-        Duan~et~al.~\cite{DuanMaoMaoShuYin2025}, with the cost monad above
-        delivering the asymptotic claim of their Lemma~3.12.
-\end{enumerate}}
+\paragraph*{Phase~3c: closing \code{HeapBridge}.}
+RelaxBridge and GraphBridge are axiom-free. The remaining heap obligation is
+\code{dijkstraRun\_dHat\_all\_complete\_at\_heapFuel}: a textbook Dijkstra
+completeness argument on \code{dijkstraRun}, using
+\code{freshPop\_isComplete\_of\_processed\_pred} and fuel cardinality lemmas
+already in \code{HeapSimulation.lean}. Discharging it yields axiom-free
+\code{HeapBridge}; only \code{NumericBridge}'s 21 IEEE-754 facts would remain.
+
+\paragraph*{NumericBridge and \textsc{Flocq}.}
+The 21 axioms form a stable, named specification of \code{Float} behaviour on
+nat-cast inputs. A meaningful next step is proving the nine order/algebra facts
+from \Mathlib's emerging float theory, or porting a \textsc{Flocq}
+fragment~\cite{BoldoMelquiond2011Flocq,BoldoMelquiond2017Book} to discharge
+groups wholesale.
+
+\paragraph*{Aeneas-driven extraction.}
+The hand-translated Refine layer could be replaced by \textsc{Aeneas}
+output~\cite{HoProtzenko2022Aeneas,HoFromherzProtzenko2024Aeneas}, gaining a
+machine-checked borrow and memory-safety bridge from Rust to \Lean{} while
+keeping the spec/Algo proof split.
+
+\paragraph*{Forward-error bounds.}
+With a \textsc{Flocq} foundation, a Higham-style $(n-1)\cdot\mathrm{ulp}$
+bound~\cite{Higham2002Accuracy} along shortest paths would connect the
+IEEE axiom block to quantitative \code{f64} accuracy claims.
+
+\paragraph*{Cost monad and \BMSSP.}
+Linking \Mathlib's \code{Asymptotics.IsBigO} to a runtime cost monad (in the
+spirit of Charguéraud--Pottier time
+credits~\cite{CharguraudPottier2015UnionFind,GueneauChargueraudPottier2018ESOP})
+would recover $(n+m)\log n$ for \Dijkstra{} and eventually support verifying
+\BMSSP{}~\cite{DuanMaoMaoShuYin2025} in the same three-layer architecture.
+The benchmark in \cref{sec:benchmark} shows that, at workstation $n$, verified
+\Dijkstra{} remains the algorithm worth deploying.
+
+\paragraph*{Threats to validity.}
+Three limitations deserve explicit mention.
+(1)~\code{native\_decide} fixture checks trust the \Lean{} compiler/runtime;
+the main theorem does not.
+(2)~\code{NumericBridge} axioms are unproven IEEE facts, not derived theorems.
+(3) The Rust$\leftrightarrow$\Lean{} correspondence is hand-checked, not
+extracted; operational agreement on four JSON graphs does not constitute a
+full refinement proof of \code{src/dijkstra.rs}.
 
 % =====================================================================
 \section*{Acknowledgements}
-\todo{Add acknowledgements (Lean Zulip, Aeneas team, etc.) and funding.}
+We thank the Lean community (Zulip) for Mathlib guidance, the Aeneas team for
+the extraction roadmap, and the authors of Duan et al.\ for publishing the
+\BMSSP{} reference implementation we benchmark against. Funding and canonical
+repository URL to be added at camera-ready.
 
 % =====================================================================
 \bibliographystyle{alpha}
