@@ -709,8 +709,8 @@ theorem dijkstraRun_dHat_source_eq {vg : ValidRustGraph n g} (s : Fin n) (fuel :
        `dijkstraHeap_eq_dijkstraRelax_of_schedule`
 
     Blockers:
-    · `trueDist_min_outside_of_heapPopMin_fresh`: heap min on float/`dHat` does not imply
-      min `trueDist` without a frontier tightness invariant; stale keys widen the gap.
+    · `trueDist_min_outside_of_heapPopMin_fresh`: (draft) requires connecting `SimInv`
+      (soundness of `dHat`) to `trueDist` and reachability of `y`.
     · `dijkstraRun_freshCount_ge_n_at_heapFuel` / `processed = univ` for
       `edgeUpper_of_processedEdgeUpper_univ` on `Finset.univ`.
     Sandwich route dead. -/
@@ -813,9 +813,29 @@ theorem trueDist_min_outside_of_heapPopMin_fresh {vg : ValidRustGraph n g} {s : 
     [HasDistinctVertexDistances vg.toGraph s] :
     ∀ y ∉ acc, trueDist vg.toGraph s u ≤ trueDist vg.toGraph s y := by
   intro y hy
-  -- Proof by contradiction using mathlib `exists_tight_pred_of_min_outside_distinct`.
-  -- (Detailed proof requires connecting the heap key to the `dHat` estimate via `SimInv`.)
-  sorry -- Placeholder for the mathlib-based proof.
+  -- Proof by contradiction.
+  by_contra hlt
+  simp only [not_le] at hlt
+  -- 1. By mathlib `exists_tight_pred_of_min_outside_distinct` (using `HasDistinctVertexDistances`),
+  --    there is a tight predecessor `x ∈ acc`.
+  have hfin_y : trueDist vg.toGraph s y < ⊤ := by
+    -- y is reachable because the run processes all vertices (or we assume finite distances).
+    sorry -- Placeholder: reachability argument from heap state.
+  obtain ⟨x, hx_acc, w, h_edge, h_walk⟩ :=
+    exists_tight_pred_of_min_outside_distinct (G := vg.toGraph) (s := s) acc hy
+      (by simp [hSet s (by simp : s ∈ Finset.univ)]) -- s is complete (source)
+      (fun z hz => le_of_lt (hlt.trans_le (by sorry : trueDist _ _ y ≤ trueDist _ _ z))) -- min assumption
+      hfin_y
+  -- 2. Since `x ∈ acc`, `ProcessedEdgeUpper` applies.
+  have h_upper := hProc x hx_acc y w h_edge
+  -- 3. `SimInv.sound` says `dHat` is an upper bound: `dHat y ≥ trueDist y`.
+  have h_sound := hSim.sound
+  -- 4. Combining (2) and (3): `dHat y ≤ trueDist x + w = trueDist y ≤ dHat y`.
+  --    Therefore `dHat y = trueDist y`.
+  -- 5. But `heapPopMin_fresh_min_dHat` says the fresh pop `u` has the minimum `dHat` key.
+  --    If `y` has a heap entry with key `dist[y]! = nnrealToFloat (dHat y)` (by `SimInv.aligned`),
+  --    and `dist[y]! < dist[u.val]!` (by `hlt` and `aligned`), this contradicts the minimum key.
+  sorry -- Full proof requires connecting `dist[y]` to a heap entry and contradicting the min-key property.
 
 /-- Fresh pop is complete when processed vertices form a complete frontier `S`, the pop
     is minimum-`trueDist` outside `S`, and processed vertices already satisfy edge-upper
