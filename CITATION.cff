@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this research artifact, please cite it and the original arXiv paper."
+title: "graphs-bench: Rust and Lean artifacts for directed SSSP experiments"
+authors:
+  - family-names: "sergantche"
+repository-code: "https://github.com/ilerik/graphs-bench"
+date-released: "2026-06-07"
+version: "0.1.0-publication-prep"
+keywords:
+  - "single-source shortest paths"
+  - "graph algorithms"
+  - "Lean"
+  - "Rust"
+  - "formal verification"
+references:
+  - type: article
+    title: "Breaking the Sorting Barrier for Directed Single-Source Shortest Paths"
+    authors:
+      - family-names: "Duan"
+        given-names: "Ran"
+      - family-names: "Mao"
+        given-names: "Jiayi"
+      - family-names: "Mao"
+        given-names: "Xiao"
+      - family-names: "Shu"
+        given-names: "Xinkai"
+      - family-names: "Yin"
+        given-names: "Longhui"
+    year: 2025
+    url: "https://arxiv.org/abs/2504.17033"
+    notes: "arXiv:2504.17033v2"
