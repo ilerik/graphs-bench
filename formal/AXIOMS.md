@@ -13,9 +13,11 @@ What is currently proved without `sorry`:
   algorithm computes `trueDist`.
 - `Sssp.Refine.refine_dijkstra_correct`: the operational CSR/Float/lazy-heap
   model matches the verified distance on every `ValidRustGraph`, **assuming**
-  the bridge axioms below.
+  the numeric and heap bridge axioms below.
 - `Sssp.Refine.relaxOutEdges_eq_relaxCsrOut`: CSR out-edge relaxation order is
   now proved by a permutation/counting argument, not trusted.
+- `Sssp.Refine.GraphBridge.outEdge_floatWeight_preimage`: every CSR slot
+  produced by `fromEdgeList` over nat weights stores a `floatWeight` image.
 - Fixture regressions: shared JSON examples agree between the Lean operational
   model and Rust tests.
 
@@ -55,14 +57,6 @@ and the embedding from `WithTop NNReal` to `Float`.
 | `float_min_eq_right_of_le` | `min` behavior for floats. | Same as above. |
 | `float_le_of_not_lt` | Linear-order behavior for floats. | Same as above. |
 | `float_le_of_lt` | Strict-to-nonstrict order bridge. | Same as above. |
-
-## Graph Bridge
-
-Module: `formal/lean/Sssp/Refine/GraphBridge.lean`
-
-| Declaration | Why it is trusted now | Replacement direction |
-|-------------|-----------------------|-----------------------|
-| `outEdge_floatWeight_preimage` | States that every CSR slot produced by `fromEdgeList` stores some `floatWeight w`. | Prove directly from `RustGraph.fromEdgeList`, `mergeSort`, and the mapped edge list. |
 
 ## Heap Bridge
 

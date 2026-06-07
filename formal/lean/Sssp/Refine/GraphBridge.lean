@@ -40,10 +40,177 @@ def edgeOutWeight (n : Nat) (es : List (Nat × Nat × Nat)) (u i : Nat)
   let edges := (edgeListGraph n es).outEdges u
   (edges[i]'hi).2
 
+/-- CSR out-edge indices are bounded by the right endpoint of their head range. -/
+private theorem outEdgeIndices_getElem_lt_head_next (g : RustGraph) (u i : Nat)
+    (hi : i < (g.outEdgeIndices u).length) :
+    (g.outEdgeIndices u)[i]'hi < g.head[u + 1]! := by
+  by_cases hhead : u + 1 < g.head.length
+  · simp [RustGraph.outEdgeIndices, hhead] at hi ⊢
+    omega
+  · simp [RustGraph.outEdgeIndices, hhead] at hi
+
+/-- A one-hot sum over a no-duplicate natural list is the list count. -/
+private theorem sum_map_beq_eq_count (a : Nat) :
+    ∀ l : List Nat, ((l.map fun x => if a == x then 1 else 0).sum) = l.count a
+  | [] => by simp
+  | x :: xs => by
+      simp only [List.map_cons, List.sum_cons]
+      rw [sum_map_beq_eq_count a xs]
+      by_cases h : a = x
+      · subst a
+        simp [Nat.add_comm]
+      · simp [h, Ne.symm h]
+
+/-- A one-hot source contribution is counted at most once over `range n`. -/
+private theorem sum_map_beq_range_le_one (a n : Nat) :
+    ((List.range n).map fun x => if a == x then 1 else 0).sum ≤ 1 := by
+  rw [sum_map_beq_eq_count]
+  exact (List.nodup_iff_count_le_one.mp List.nodup_range) a
+
+/-- The sum of per-source edge counts over `range n` is bounded by the edge-list length. -/
+private theorem counts_sum_le_edges_length (n : Nat) (edges : List (Nat × Nat × Float)) :
+    ((List.range n).map fun u => (edges.filter fun e => e.1 == u).length).sum ≤
+      edges.length := by
+  induction edges with
+  | nil =>
+      simp
+  | cons e es ih =>
+      have hpoint : ∀ u,
+          ((e :: es).filter fun e' => e'.1 == u).length =
+            (if e.1 == u then 1 else 0) + (es.filter fun e' => e'.1 == u).length := by
+        intro u
+        by_cases h : e.1 == u
+        · simp [h]
+          omega
+        · simp [h]
+      calc
+        ((List.range n).map fun u => ((e :: es).filter fun e' => e'.1 == u).length).sum
+            = ((List.range n).map fun u => (if e.1 == u then 1 else 0)).sum +
+                ((List.range n).map fun u => (es.filter fun e' => e'.1 == u).length).sum := by
+              simp_rw [hpoint]
+              simp [List.sum_map_add]
+        _ ≤ 1 + es.length := Nat.add_le_add (sum_map_beq_range_le_one e.1 n) ih
+        _ = (e :: es).length := by simp [Nat.add_comm]
+
+/-- The CSR-head builder appends one entry for each count. -/
+private theorem foldl_head_length (counts acc : List Nat) :
+    (counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) acc).length =
+      acc.length + counts.length := by
+  induction counts generalizing acc with
+  | nil =>
+      simp
+  | cons c cs ih =>
+      simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using
+        ih (acc ++ [acc.getLast! + c])
+
+/-- Every generated head entry is bounded by the previous last entry plus remaining counts. -/
+private theorem foldl_head_mem_le_last_add_sum (counts acc : List Nat)
+    (hacc_le : ∀ x ∈ acc, x ≤ acc.getLast!) {x : Nat}
+    (hx : x ∈ counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) acc) :
+    x ≤ acc.getLast! + counts.sum := by
+  induction counts generalizing acc with
+  | nil =>
+      simpa using hacc_le x hx
+  | cons c cs ih =>
+      let acc' := acc ++ [acc.getLast! + c]
+      have hacc' : acc' ≠ [] := by simp [acc']
+      have hlast : acc'.getLast! = acc.getLast! + c := by
+        simp [acc']
+      have hacc'_le : ∀ y ∈ acc', y ≤ acc'.getLast! := by
+        intro y hy
+        rw [hlast]
+        simp [acc'] at hy
+        rcases hy with hy | hy
+        · exact Nat.le_trans (hacc_le y hy) (Nat.le_add_right _ _)
+        · simp [hy]
+      have hx' : x ∈ cs.foldl (fun acc c => acc ++ [acc.getLast! + c]) acc' := by
+        simpa [acc'] using hx
+      have hle := ih acc' hacc'_le hx'
+      rw [hlast] at hle
+      simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hle
+
+/-- Any indexed head entry generated from counts is bounded by the count sum. -/
+private theorem foldl_head_getElem_le_sum (counts : List Nat) (idx : Nat)
+    (hidx : idx < (counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0]).length) :
+    (counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0])[idx]'hidx ≤ counts.sum := by
+  have hmem :
+      (counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0])[idx]'hidx ∈
+        counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0] :=
+    List.getElem_mem hidx
+  simpa using
+    (foldl_head_mem_le_last_add_sum counts [0]
+      (by intro x hx; simpa using hx) hmem)
+
+/-- Any total head lookup generated from counts is bounded by the count sum. -/
+private theorem foldl_head_getElem!_le_sum (counts : List Nat) (idx : Nat) :
+    (counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0])[idx]! ≤ counts.sum := by
+  by_cases hidx : idx < (counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0]).length
+  · let head := counts.foldl (fun acc c => acc ++ [acc.getLast! + c]) [0]
+    have hidx' : idx < head.length := by simpa [head] using hidx
+    have hget : head[idx]! = head[idx]'hidx' := getElem!_pos head idx hidx'
+    change head[idx]! ≤ counts.sum
+    rw [hget]
+    simpa [head] using foldl_head_getElem_le_sum counts idx hidx
+  · rw [getElem!_neg]
+    · simp
+    · exact hidx
+
+/-- Every CSR head entry built by `fromEdgeList` is bounded by `edgeW.length`. -/
+private theorem fromEdgeList_head_getElem_le_edgeW_length
+    (n : Nat) (edges : List (Nat × Nat × Float)) (idx : Nat) :
+    (RustGraph.fromEdgeList n edges).head[idx]! ≤
+      (RustGraph.fromEdgeList n edges).edgeW.length := by
+  unfold RustGraph.fromEdgeList
+  exact le_trans (foldl_head_getElem!_le_sum
+    ((List.range n).map fun u => (edges.filter fun e => e.1 == u).length) idx)
+    (by simpa using counts_sum_le_edges_length n edges)
+
+/-- Every CSR head entry built from nat triples is bounded by `edgeW.length`. -/
+private theorem edgeListGraph_head_getElem_le_edgeW_length
+    (n : Nat) (es : List (Nat × Nat × Nat)) (idx : Nat) :
+    (edgeListGraph n es).head[idx]! ≤ (edgeListGraph n es).edgeW.length := by
+  unfold edgeListGraph
+  exact fromEdgeList_head_getElem_le_edgeW_length n
+    (es.map fun e => (e.1, e.2.1, floatWeight e.2.2)) idx
+
+/-- Every stored weight in a graph built from nat triples has a nat preimage. -/
+private theorem edgeListGraph_edgeW_mem_preimage (n : Nat) (es : List (Nat × Nat × Nat))
+    {w : Float} (hw : w ∈ (edgeListGraph n es).edgeW) :
+    ∃ k : Nat, floatWeight k = w := by
+  unfold edgeListGraph RustGraph.fromEdgeList at hw
+  simp only [List.mem_map] at hw
+  obtain ⟨p, hp, rfl⟩ := hw
+  obtain ⟨e, he, rfl⟩ := hp
+  have he' : e ∈ es.map fun e => (e.1, e.2.1, floatWeight e.2.2) := by
+    exact (List.Perm.mem_iff (List.mergeSort_perm _ _)).mp he
+  simp only [List.mem_map] at he'
+  obtain ⟨e', _, heq⟩ := he'
+  subst e
+  exact ⟨e'.2.2, rfl⟩
+
+/-- Every in-bounds `edgeW` lookup in a nat-edge-list graph has a nat preimage. -/
+private theorem edgeListGraph_edgeW_getElem_preimage (n : Nat) (es : List (Nat × Nat × Nat))
+    (idx : Nat) (hidx : idx < (edgeListGraph n es).edgeW.length) :
+    ∃ k : Nat, floatWeight k = (edgeListGraph n es).edgeW[idx]! := by
+  have hmem : (edgeListGraph n es).edgeW[idx]! ∈ (edgeListGraph n es).edgeW := by
+    simp [hidx]
+  exact edgeListGraph_edgeW_mem_preimage n es hmem
+
 /-- Every CSR slot built from a nat edge list stores a `floatWeight` image. -/
-axiom outEdge_floatWeight_preimage (n : Nat) (es : List (Nat × Nat × Nat)) (u i : Nat)
+theorem outEdge_floatWeight_preimage (n : Nat) (es : List (Nat × Nat × Nat)) (u i : Nat)
     (hi : i < ((edgeListGraph n es).outEdges u).length) :
-    ∃ w : Nat, floatWeight w = edgeOutWeight n es u i hi
+    ∃ k : Nat, floatWeight k = edgeOutWeight n es u i hi := by
+  unfold edgeOutWeight RustGraph.outEdges
+  simp only [List.getElem_map]
+  have hidx :
+      ((edgeListGraph n es).outEdgeIndices u)[i]'(by simpa [RustGraph.outEdges] using hi) <
+        (edgeListGraph n es).edgeW.length :=
+    Nat.lt_of_lt_of_le
+      (outEdgeIndices_getElem_lt_head_next (edgeListGraph n es) u i
+        (by simpa [RustGraph.outEdges] using hi))
+      (edgeListGraph_head_getElem_le_edgeW_length n es (u + 1))
+  exact edgeListGraph_edgeW_getElem_preimage n es
+    (((edgeListGraph n es).outEdgeIndices u)[i]'(by simpa [RustGraph.outEdges] using hi)) hidx
 
 /-- Construct `HasNatWeights` for graphs built from `(u, v, w)` nat triples. -/
 noncomputable def hasNatWeights_fromEdgeList (n : Nat) (es : List (Nat × Nat × Nat)) :

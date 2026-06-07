@@ -27,7 +27,7 @@ The strongest current all-input theorem is the Dijkstra refinement theorem
 CSR/Float/lazy-heap model to the verified `Sssp.Algo.Dijkstra` distance on
 every `ValidRustGraph`. This theorem is a useful milestone, but it is **not
 yet a zero-trust proof**: it still depends on trusted `axiom` declarations in
-the numeric, graph-preimage, and heap-simulation bridges. See
+the numeric and heap-simulation bridges. See
 [`AXIOMS.md`](./AXIOMS.md) for the exact trusted surface.
 
 | Module             | Status                                          | Algorithmic content       |
@@ -44,7 +44,7 @@ the numeric, graph-preimage, and heap-simulation bridges. See
 | `Sssp.Algo.Dijkstra` | **Verified (Phase 3, complete).** `dijkstra_correct` | `n`-round relaxation      |
 | `Sssp.Refine.Dijkstra` | Operational Float/CSR/lazy-heap model + step lemmas   | mirrors `src/dijkstra.rs` |
 | `Sssp.Refine.Bridge` | CSR ↔ graph checks on fixtures (**regression only**)  | —                         |
-| `Sssp.Refine.GraphBridge` | CSR → `Graph n` bridge for nat-weighted valid graphs | partial, one trusted preimage axiom |
+| `Sssp.Refine.GraphBridge` | CSR → `Graph n` bridge for nat-weighted valid graphs | proved preimage/counting bridge |
 | `Sssp.Refine.NumericBridge` | `WithTop NNReal`/nat distances → `Float` bridge | partial, trusted float facts |
 | `Sssp.Refine.RelaxBridge` | Aligns float relax rounds with verified relax rounds | proved, depends on numeric bridge assumptions |
 | `Sssp.Refine.HeapBridge` | Connects lazy heap Dijkstra to relax-round model | trusted heap axiom + fixture checks |

@@ -82,9 +82,9 @@ Length lemmas are already proved.
 
 ### 3. Graph bridge (`Sssp.Refine.GraphBridge`)
 
-| Axiom | Replacement strategy |
-|-------|---------------------|
-| `outEdge_floatWeight_preimage` | Lemma: `fromEdgeList` stores `floatWeight w`; link `outEdges` index to edge list entry |
+| Item | Status |
+|------|--------|
+| `outEdge_floatWeight_preimage` | **Proved** — `fromEdgeList` stores `floatWeight w`; CSR head counts bound out-edge indices |
 
 Fixture `ValidRustGraph` instances are **proved** (no axioms).
 
@@ -116,5 +116,6 @@ Fixtures prove **operational agreement**; they do not replace proof obligations 
 
 ## Next milestone
 
-**Phase 3c:** next eliminate the GraphBridge preimage axiom (item 3 above), then heap simulation (item 4).
+**Phase 3c:** next eliminate the heap simulation axiom (item 4 above), while
+continuing to shrink the numeric bridge.
 Phase 4 (`DStruct`, …) stays blocked until Phase 3c axioms are gone or explicitly deferred.

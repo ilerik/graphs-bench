@@ -23,7 +23,7 @@
   │ Sssp.Algo.Dijkstra │ Verified (`dijkstra_correct`)           │ —                     │
   │ Sssp.Refine.Dijkstra │ Float/CSR heap + step lemmas          │ —                        │
   │ Sssp.Refine.Bridge │ Fixture regression (not proof target)   │ —                        │
-  │ Sssp.Refine.GraphBridge │ CSR→Graph bridge (one preimage axiom)      │ —                        │
+  │ Sssp.Refine.GraphBridge │ CSR→Graph bridge (preimage proved)         │ —                        │
   │ Sssp.Refine.NumericBridge │ Float/`NNReal` embedding (Phase 3b)      │ —                        │
   │ Sssp.Refine.RelaxBridge │ CSR relax alignment (proved)              │ —                        │
   │ Sssp.Refine.Simulation  │ `floatRelaxRound` + invariants (3b)      │ —                        │
