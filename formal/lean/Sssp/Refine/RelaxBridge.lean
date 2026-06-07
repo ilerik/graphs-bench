@@ -2,8 +2,8 @@
   Sssp.Refine.RelaxBridge
 
   Align CSR `floatRelax*` with verified `relax*` on `csrToGraph` (Phase 3b/3c).
-  Edge alignment: `floatRelaxEdge_aligned` proved; out alignment proved modulo
-  `relaxOutEdges_eq_relaxCsrOut`; all-round still axiomatized.
+  Edge alignment: `floatRelaxEdge_aligned` proved; out/full-round alignment
+  remains modulo `relaxOutEdges_eq_relaxCsrOut`.
 -/
 
 import Mathlib
@@ -51,7 +51,7 @@ theorem floatRelaxAll_length (dist : List Float) (hn : dist.length = g.n) (hgn :
 /-! ### List lookup -/
 
 private theorem floatRelaxEdge_get_ne (dist : List Float) (u tgt i : Nat) (w : Float)
-    (hi : i < dist.length) (hne : i ≠ tgt) :
+    (_hi : i < dist.length) (hne : i ≠ tgt) :
     (floatRelaxEdge dist u tgt w)[i]! = dist[i]! := by
   simp only [floatRelaxEdge]
   split_ifs <;> grind
@@ -59,7 +59,7 @@ private theorem floatRelaxEdge_get_ne (dist : List Float) (u tgt i : Nat) (w : F
 /-! ### Edge alignment -/
 
 /-- Single-edge float relax matches verified `relaxEdge` off the target vertex. -/
-theorem floatRelaxEdge_aligned_ne {vg : ValidRustGraph n g} (dHat : DistEstimate n)
+theorem floatRelaxEdge_aligned_ne (dHat : DistEstimate n)
     (dist : List Float) (hlen : dist.length = n)
     (halign : ∀ x : Fin n, dist[x.val]! = nnrealToFloat (dHat x)) (u v : Fin n) (w : Nat)
     (x : Fin n) (hx : x ≠ v) :
@@ -71,7 +71,7 @@ theorem floatRelaxEdge_aligned_ne {vg : ValidRustGraph n g} (dHat : DistEstimate
   simp [relaxEdge, Function.update, hx, halign x]
 
 /-- Single-edge float relax matches verified `relaxEdge` at the target vertex. -/
-theorem floatRelaxEdge_aligned_v {vg : ValidRustGraph n g} (dHat : DistEstimate n)
+theorem floatRelaxEdge_aligned_v (dHat : DistEstimate n)
     (dist : List Float) (hlen : dist.length = n)
     (halign : ∀ x : Fin n, dist[x.val]! = nnrealToFloat (dHat x)) (u v : Fin n) (w : Nat) :
     (floatRelaxEdge dist u.val v.val (floatWeight w))[v.val]! =
@@ -140,8 +140,8 @@ theorem floatRelaxEdge_aligned {vg : ValidRustGraph n g} (dHat : DistEstimate n)
   intro x
   by_cases hx : x = v
   · cases hx
-    exact floatRelaxEdge_aligned_v (vg := vg) dHat dist hlen halign u v w
-  · exact floatRelaxEdge_aligned_ne (vg := vg) dHat dist hlen halign u v w x hx
+    exact floatRelaxEdge_aligned_v dHat dist hlen halign u v w
+  · exact floatRelaxEdge_aligned_ne dHat dist hlen halign u v w x hx
 
 /-! ### Out-edge alignment -/
 
@@ -196,7 +196,7 @@ private theorem floatRelaxOut_relaxCsrOutAux_aligned (vg : ValidRustGraph n g) (
     intro dHat dist hlen halign csrIdx hcsrIdx hsub x
     have hi : csrIdx < (g.outEdges u.val).length := by
       rw [← hcsrIdx, List.length_cons]; omega
-    have hdrop : (g.outEdges u.val).drop csrIdx = edge :: xs := by simpa [hsub] using hsub
+    have hdrop : (g.outEdges u.val).drop csrIdx = edge :: xs := hsub.symm
     have hedge : (g.outEdges u.val)[csrIdx]'hi = edge := by
       have hcons := List.cons_getElem_drop_succ (l := g.outEdges u.val) (n := csrIdx) (h := hi)
       rw [hdrop] at hcons

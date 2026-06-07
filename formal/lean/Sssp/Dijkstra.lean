@@ -32,6 +32,24 @@ variable {n : ℕ} (G : Graph n) (s : Fin n)
 def relaxEdge (dHat : DistEstimate n) (u v : Fin n) (w : NNReal) : DistEstimate n :=
   Function.update dHat v (min (dHat v) (dHat u + (w : WithTop NNReal)))
 
+/-- Relaxing a nonnegative self-loop cannot improve the source estimate. -/
+lemma relaxEdge_self (dHat : DistEstimate n) (u : Fin n) (w : NNReal) :
+    relaxEdge dHat u u w = dHat := by
+  funext x
+  by_cases hx : x = u
+  · subst x
+    simp [relaxEdge, Function.update]
+  · simp [relaxEdge, Function.update, hx]
+
+/-- Relaxing an outgoing edge leaves the source estimate unchanged. -/
+lemma relaxEdge_source (dHat : DistEstimate n) (u v : Fin n) (w : NNReal) :
+    relaxEdge dHat u v w u = dHat u := by
+  by_cases h : v = u
+  · subst v
+    simp [relaxEdge_self]
+  · have h' : u ≠ v := fun huv => h huv.symm
+    simp [relaxEdge, Function.update, h']
+
 /-- Relax all out-edges of `u`. -/
 noncomputable def relaxOutEdges (G : Graph n) (dHat : DistEstimate n) (u : Fin n) : DistEstimate n :=
   (G.outEdges u).toList.foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat
