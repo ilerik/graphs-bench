@@ -121,9 +121,11 @@ lake exe cache get
 lake build
 ```
 
-`lake build` should succeed without warnings.  Spec-side modules elaborate
-because their definitions are designed to satisfy their own theorems
-trivially; the `Sssp.Algo.<X>` modules contain the genuine proofs.
+`lake build` should complete successfully. It may emit existing linter warnings
+about unused simp arguments; those warnings are tracked cleanup work, not proof
+gaps. Spec-side modules elaborate because their definitions are designed to
+satisfy their own theorems trivially; the `Sssp.Algo.<X>` modules contain the
+genuine proofs.
 
 ## Verification roadmap
 
