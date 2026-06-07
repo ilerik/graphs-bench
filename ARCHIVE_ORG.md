@@ -46,7 +46,7 @@ depends on trusted numeric and heap bridge axioms documented in
 
 ## Suggested Creator
 
-`sergantche`
+`ilerik`; `sergantche`
 
 ## License Field
 
