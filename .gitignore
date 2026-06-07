@@ -7,5 +7,15 @@ formal/lean/lean_packages/
 formal/lean/build/
 *.olean
 
+# LaTeX build artefacts from vendored paper sources
+formal/paper/source/*.aux
+formal/paper/source/*.bbl
+formal/paper/source/*.blg
+formal/paper/source/*.fls
+formal/paper/source/*.fdb_latexmk
+formal/paper/source/*.log
+formal/paper/source/*.out
+formal/paper/source/*.synctex.gz
+
 # Legacy vendored lean4-skills (canonical copy is ~/.cursor/skills/lean4)
 .opencode/lean4-skills/
