@@ -243,16 +243,14 @@ private lemma weightsToTarget_length_self (g : RustGraph) (hwt : HasNatWeights g
     (u t : Nat) (hlen : (g.outEdges u).length = 1) (h0 : 0 < (g.outEdges u).length)
     (htgt0 : ((g.outEdges u)[0]'h0).1 = t) :
     (weightsToTarget g hwt u t).length = 1 := by
-  simp only [weightsToTarget, hlen, List.range_succ, List.range_zero, List.flatMap_cons,
-    List.flatMap_nil]
+  simp only [weightsToTarget, hlen, List.range_succ, List.range_zero]
   grind
 
 private lemma weightsToTarget_length_ne (g : RustGraph) (hwt : HasNatWeights g)
     (u b t : Nat) (hlen : (g.outEdges u).length = 1) (h0 : 0 < (g.outEdges u).length)
     (htgt0 : ((g.outEdges u)[0]'h0).1 = t) (hb' : b ≠ t) :
     (weightsToTarget g hwt u b).length = 0 := by
-  simp only [weightsToTarget, hlen, List.range_succ, List.range_zero, List.flatMap_cons,
-    List.flatMap_nil]
+  simp only [weightsToTarget, hlen, List.range_succ, List.range_zero]
   grind
 
 private lemma weightsToTarget_length_two_same (g : RustGraph) (hwt : HasNatWeights g)
@@ -260,8 +258,7 @@ private lemma weightsToTarget_length_two_same (g : RustGraph) (hwt : HasNatWeigh
     (h1 : 1 < (g.outEdges u).length) (htgt0 : ((g.outEdges u)[0]'h0).1 = t)
     (htgt1 : ((g.outEdges u)[1]'h1).1 = t) :
     (weightsToTarget g hwt u t).length = 2 := by
-  simp only [weightsToTarget, hlen, List.range_succ, List.range_zero, List.flatMap_cons,
-    List.flatMap_nil]
+  simp only [weightsToTarget, hlen, List.range_succ, List.range_zero]
   grind
 
 private lemma weightsToTarget_length_two_diff (g : RustGraph) (hwt : HasNatWeights g)
@@ -269,8 +266,7 @@ private lemma weightsToTarget_length_two_diff (g : RustGraph) (hwt : HasNatWeigh
     (h1 : 1 < (g.outEdges u).length) (htgt0 : ((g.outEdges u)[0]'h0).1 = t0)
     (htgt1 : ((g.outEdges u)[1]'h1).1 = t1) (hb0 : b ≠ t0) (hb1 : b ≠ t1) :
     (weightsToTarget g hwt u b).length = 0 := by
-  simp only [weightsToTarget, hlen, List.range_succ, List.range_zero, List.flatMap_cons,
-    List.flatMap_nil]
+  simp only [weightsToTarget, hlen, List.range_succ, List.range_zero]
   grind
 
 private lemma weightsToTarget_length_at0 (g : RustGraph) (hwt : HasNatWeights g)
@@ -282,11 +278,9 @@ private lemma weightsToTarget_length_at0 (g : RustGraph) (hwt : HasNatWeights g)
       weightsToTarget g hwt u t =
         (if ((g.outEdges u)[0]'h0).1 == t then [nnrealWeight (hwt.edgeWeight u 0 h0)] else []) ++
           (if ((g.outEdges u)[1]'h1).1 == t then [nnrealWeight (hwt.edgeWeight u 1 h1)] else []) := by
-    simp [weightsToTarget, hlen, List.range_succ, List.flatMap_cons, List.flatMap_nil, if_pos h0,
-      if_pos h1]
+    simp [weightsToTarget, hlen, List.range_succ, List.flatMap_cons, List.flatMap_nil]
   rw [hdef]
-  simp [beq_iff_eq, htgt0, htgt1, Ne.symm hne, List.length_append, List.length_cons,
-    List.length_nil]
+  simp [beq_iff_eq, htgt0, htgt1, Ne.symm hne, List.length_cons, List.length_nil]
 
 private lemma weightsToTarget_length_at1 (g : RustGraph) (hwt : HasNatWeights g)
     (u t tOther : Nat) (hlen : (g.outEdges u).length = 2) (h0 : 0 < (g.outEdges u).length)
@@ -297,11 +291,9 @@ private lemma weightsToTarget_length_at1 (g : RustGraph) (hwt : HasNatWeights g)
       weightsToTarget g hwt u t =
         (if ((g.outEdges u)[0]'h0).1 == t then [nnrealWeight (hwt.edgeWeight u 0 h0)] else []) ++
           (if ((g.outEdges u)[1]'h1).1 == t then [nnrealWeight (hwt.edgeWeight u 1 h1)] else []) := by
-    simp [weightsToTarget, hlen, List.range_succ, List.flatMap_cons, List.flatMap_nil, if_pos h0,
-      if_pos h1]
+    simp [weightsToTarget, hlen, List.range_succ, List.flatMap_cons, List.flatMap_nil]
   rw [hdef]
-  simp [beq_iff_eq, htgt0, htgt1, Ne.symm hne, List.length_append, List.length_cons,
-    List.length_nil]
+  simp [beq_iff_eq, htgt0, htgt1, Ne.symm hne, List.length_cons, List.length_nil]
 
 private lemma sum_weightsToTarget_zero (g : RustGraph) (hwt : HasNatWeights g) (n : Nat)
     (u : Fin n) (hlen : (g.outEdges u.val).length = 0) :
@@ -386,7 +378,7 @@ theorem sum_weightsToTarget_length (g : RustGraph) (n : Nat) (hwt : HasNatWeight
   | len + 3, _ => omega
 
 /-- Build a verified `Graph n` from a CSR graph with natural `Float` weights. -/
-noncomputable def csrToGraph (g : RustGraph) (n : Nat) (hn : g.n = n) (hwt : HasNatWeights g)
+noncomputable def csrToGraph (g : RustGraph) (n : Nat) (_hn : g.n = n) (hwt : HasNatWeights g)
     (htgt : targetsIn g n) (hdeg : outDegNatLe g n) : Graph n where
   edges := fun u v => Multiset.ofList (weightsToTarget g hwt u.val v.val)
   outDeg_le := by
@@ -428,7 +420,7 @@ theorem csr_outEdge_mem {g : RustGraph} {n : Nat} (hn : g.n = n) {hwt : HasNatWe
     (hw : w = hwt.edgeWeight u.val i hi) :
     nnrealWeight w ∈ (csrToGraph g n hn hwt htgt hdeg).edges u v := by
   rw [mem_edges_csrToGraph (g := g) (n := n) hn (hwt := hwt) (htgt := htgt) (hdeg := hdeg)]
-  exact ⟨i, hi, htgt', by simpa [nnrealWeight, hw]⟩
+  exact ⟨i, hi, htgt', by simp [nnrealWeight, hw]⟩
 
 theorem csr_outEdge_float {g : RustGraph} {n : Nat} (_hn : g.n = n) {hwt : HasNatWeights g}
     {u : Fin n} {i : Nat} (hi : i < (g.outEdges u.val).length) :

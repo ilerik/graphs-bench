@@ -112,7 +112,7 @@ theorem nonempty_walk_of_trueDist_lt_top {n : ℕ} (G : Graph n) (s u : Fin n)
     dsimp [trueDist]
     simp [iInf_of_isEmpty]
   rw [this] at h
-  simp [lt_top_iff_ne_top] at h
+  simp at h
 
 /-- Every walk can be loop-trimmed to use at most `n` edges without increasing length. -/
 theorem exists_trimmed_walk {n : ℕ} (G : Graph n) {s u : Fin n} (w : Walk G s u) :
@@ -196,7 +196,7 @@ private lemma walksOfLength_numEdges {n : ℕ} {G : Graph n} {s u : Fin n} {k : 
       rfl
     · simp [walksOfLength, h] at hw
   | succ k ih =>
-    simp only [walksOfLength, Finset.mem_biUnion, Finset.mem_image, true_and] at hw
+    simp only [walksOfLength, Finset.mem_biUnion, Finset.mem_image] at hw
     obtain ⟨p, _, w', hw', rfl⟩ := hw
     dsimp [Walk.consStep, Walk.numEdges]
     exact congrArg Nat.succ (ih (s := p.1.1) hw')
@@ -210,20 +210,20 @@ private lemma mem_walksOfLength_of_numEdges {n : ℕ} {G : Graph n} {s u : Fin n
     cases valid with
     | nil h =>
       simp [walksOfLength, h, Finset.mem_singleton]
-    | cons _ _ _ _ _ _ => simp [Walk.numEdges] at hk
+    | cons _ _ _ _ _ _ => simp at hk
   | succ k ih =>
     rcases w with ⟨steps, valid⟩
     cases valid with
     | nil => simp [Walk.numEdges] at hk
     | cons _ v w₀ rest h_edge h_tail =>
       simp only [Walk.numEdges] at hk
-      have hk' : rest.length = k := by simp [Walk.numEdges] at hk; omega
+      have hk' : rest.length = k := by simp at hk; omega
       let w' : Walk G v u := ⟨rest, h_tail⟩
       have hw' : w' ∈ walksOfLength G v u k := ih w' hk'
       have hout : (v, w₀) ∈ (G.outEdges s).toFinset := by
         simpa [Multiset.mem_toFinset, mem_outEdges_iff] using h_edge
       let edge : ↥(G.outEdges s).toFinset := ⟨(v, w₀), hout⟩
-      simp only [walksOfLength, Finset.mem_biUnion, Finset.mem_image, true_and]
+      simp only [walksOfLength, Finset.mem_biUnion, Finset.mem_image]
       refine ⟨edge, ?_, w', hw', rfl⟩
       exact Finset.mem_attach _ edge
 

@@ -25,9 +25,9 @@ lemma initDist_length (g : RustGraph) (source : Nat) : (initDist g source).lengt
 lemma initDist_get {vg : ValidRustGraph n g} (s v : Fin n) :
     (initDist g s.val)[v.val]! = if v.val == s.val then 0.0 else distInf := by
   have hv : v.val < g.n := by rw [vg.hn]; exact v.isLt
-  have hlen : v.val < (initDist g s.val).length := by simpa [initDist_length, vg.hn] using hv
+  have hlen : v.val < (initDist g s.val).length := by simp [initDist_length, vg.hn]
   rw [List.getElem!_eq_getElem?_getD, List.getElem?_eq_getElem hlen]
-  simp [initDist, List.getElem_map, List.getElem_range, hv, beq_iff_eq]
+  simp [initDist, List.getElem_map, List.getElem_range, beq_iff_eq]
 
 def DistSound (G : Graph n) (s : Fin n) (dist : List Float) : Prop :=
   dist.length = n ∧
@@ -43,7 +43,7 @@ theorem nnrealToFloat_zero : nnrealToFloat (0 : WithTop NNReal) = 0.0 := by
 theorem initDist_sound {vg : ValidRustGraph n g} (s : Fin n) :
     DistSound vg.toGraph s (initDist g s.val) := by
   constructor
-  · simp [DistSound, initDist_length, vg.hn]
+  · simp [initDist_length, vg.hn]
   · intro v
     rw [initDist_get (vg := vg) s v]
     by_cases h : v.val == s.val
@@ -64,7 +64,7 @@ theorem initSimInv {vg : ValidRustGraph n g} (s : Fin n) :
     by_cases h : v.val == s.val
     · have heq : v = s := Fin.ext (beq_iff_eq.mp h)
       subst heq
-      simp [h, initEstimate_self, nnrealToFloat_zero]
+      simp [initEstimate_self, nnrealToFloat_zero]
     · have hs : v.val ≠ s.val := (beq_iff_eq.not.mp h)
       have hv : v ≠ s := fun heq => hs (congrArg Fin.val heq)
       simp [hs, initEstimate_ne _ _ hv, nnrealToFloat_top]

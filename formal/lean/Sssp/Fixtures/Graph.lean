@@ -103,8 +103,8 @@ noncomputable def unreachableValid : ValidRustGraph 5 unreachableRust where
 noncomputable def singleVertexValid : ValidRustGraph 1 singleVertexRust where
   hn := rfl
   hwt := hasNatWeights_rustGraphFromNatEdges 1 []
-  htgt := by intro u p hp; fin_cases u <;> native_decide +revert
-  hdeg := by intro u; fin_cases u <;> native_decide
+  htgt := by intro u p hp; (fin_cases u; native_decide +revert)
+  hdeg := by intro u; (fin_cases u; native_decide)
 
 end Fixtures
 end Sssp

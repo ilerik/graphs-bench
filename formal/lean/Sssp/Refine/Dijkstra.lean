@@ -24,7 +24,7 @@ structure RustGraph where
 namespace RustGraph
 
 def outEdgeIndices (g : RustGraph) (u : Nat) : List Nat :=
-  if h : u + 1 < g.head.length then
+  if _h : u + 1 < g.head.length then
     let s := g.head[u]!
     let e := g.head[u + 1]!
     (List.range (e - s)).map (fun i => s + i)

@@ -31,20 +31,20 @@ private lemma le_relaxEdge (dHat : DistEstimate n) (u v : Fin n) (w : NNReal) (x
     (relaxEdge dHat u v w) x ≤ dHat x := by
   unfold relaxEdge
   by_cases hx : x = v
-  · subst hx; simp [Function.update, le_min]
-  · simp [Function.update, hx, le_min]
+  · subst hx; simp [Function.update]
+  · simp [Function.update, hx]
 
 private lemma relaxEdge_le_add (dHat : DistEstimate n) (src tgt : Fin n) (w : NNReal) :
     (relaxEdge dHat src tgt w) tgt ≤ dHat src + (w : WithTop NNReal) := by
-  simp [relaxEdge, le_min]
+  simp [relaxEdge]
 
 private lemma relaxEdge_mono (d₁ d₂ : DistEstimate n) (h : ∀ x, d₂ x ≤ d₁ x) (u tgt : Fin n)
     (w : NNReal) (x : Fin n) : (relaxEdge d₂ u tgt w) x ≤ (relaxEdge d₁ u tgt w) x := by
   unfold relaxEdge
   by_cases hx : x = tgt
-  · simpa [relaxEdge, hx, Function.update, if_pos hx, le_min] using
+  · simpa [relaxEdge, hx, Function.update, if_pos hx] using
       min_le_min (h tgt) (add_le_add_left (h u) (w : WithTop NNReal))
-  · simp [relaxEdge, Function.update, hx, h]
+  · simp [Function.update, hx, h]
 
 private lemma foldl_relaxEdges_le (u : Fin n) (l : List (Fin n × NNReal)) (dHat : DistEstimate n)
     (v : Fin n) :
@@ -253,12 +253,12 @@ private theorem relaxRound_sound {G : Graph n} {s : Fin n} (fuel : ℕ) (dHat : 
     dsimp [relaxRound]
     exact ih (relaxAll G dHat) (relaxAll_sound dHat h)
 
-private lemma relaxEdge_preserves_zero_at_source {G : Graph n} {s : Fin n} {dHat : DistEstimate n}
+private lemma relaxEdge_preserves_zero_at_source {_G : Graph n} {s : Fin n} {dHat : DistEstimate n}
     (h : dHat s = 0) (u v : Fin n) (w : NNReal) :
     (relaxEdge dHat u v w) s = 0 := by
   by_cases hv : v = s
   · subst hv
-    simp [relaxEdge, h, le_min, min_eq_left (zero_le _)]
+    simp [relaxEdge, h]
   · simp [relaxEdge, Function.update, ne_comm.mp hv, h]
 
 private lemma relaxOutEdges_preserves_zero_at_source {G : Graph n} {s u : Fin n} {dHat : DistEstimate n}
@@ -273,7 +273,7 @@ private lemma relaxOutEdges_preserves_zero_at_source {G : Graph n} {s u : Fin n}
   | nil => simp [List.foldl, h']
   | cons p xs ih =>
     simp only [List.foldl]
-    exact ih _ (relaxEdge_preserves_zero_at_source (G := G) h' u p.1 p.2)
+    exact ih _ (relaxEdge_preserves_zero_at_source (_G := G) h' u p.1 p.2)
 
 private lemma relaxAll_preserves_zero_at_source {G : Graph n} {s : Fin n} {dHat : DistEstimate n}
     (h : dHat s = 0) : (relaxAll G dHat) s = 0 := by

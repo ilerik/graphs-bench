@@ -42,16 +42,16 @@ noncomputable def trueDistNat (G : Graph n) (s v : Fin n) : WithTop Nat :=
 
 theorem withTopNatToFloat_top : withTopNatToFloat ⊤ = distInf := by simp [withTopNatToFloat]
 theorem withTopNatToFloat_nat (k : Nat) : withTopNatToFloat k = floatWeight k := by
-  simp [withTopNatToFloat, floatWeight]
+  simp [withTopNatToFloat]
 theorem nnrealToFloat_top : nnrealToFloat ⊤ = distInf := by simp [nnrealToFloat]
 theorem nnrealToFloat_ofNat (k : Nat) : nnrealToFloat (k : WithTop NNReal) = floatWeight k := by
   change nnrealToFloat (.some (k : NNReal)) = floatWeight k
-  simp [nnrealToFloat, floatWeight]
+  simp [nnrealToFloat]
 
 theorem withTopNnrealToNat_ofNat (k : Nat) : withTopNnrealToNat (k : WithTop NNReal) = k := by
   show withTopNnrealToNat (.some (k : NNReal)) = k
   unfold withTopNnrealToNat
-  simp [show ∃ k' : Nat, (k' : NNReal) = (k : NNReal) from ⟨k, rfl⟩]
+  simp
 
 theorem withTopNatToFloat_nnrealToFloat (x : WithTop NNReal) :
     withTopNatToFloat (withTopNnrealToNat x) = nnrealToFloat x := by
@@ -60,8 +60,8 @@ theorem withTopNatToFloat_nnrealToFloat (x : WithTop NNReal) :
   | (r : NNReal) =>
     unfold withTopNnrealToNat nnrealToFloat withTopNatToFloat
     by_cases h : ∃ k : Nat, (k : NNReal) = r
-    · simp [WithTop.some_eq_coe, h]
-    · simp [WithTop.some_eq_coe, h]
+    · simp [h]
+    · simp [h]
 
 theorem trueDistNat_ofNat (G : Graph n) (s v : Fin n) (k : Nat)
     (h : Algo.dijkstra G s v = (k : WithTop NNReal)) :

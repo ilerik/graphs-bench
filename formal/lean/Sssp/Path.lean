@@ -155,7 +155,7 @@ lemma vertexAt_walk_succ {u : Fin n} {v w0 rest}
     (k : ℕ) (hk : k + 1 ≤ ((v, w0) :: rest).length) (hk' : k ≤ rest.length) :
     vertexAt ⟨(v, w0) :: rest, WalkValid.cons s v w0 rest h_edge h_tail⟩ (k + 1) hk =
     vertexAt ⟨rest, h_tail⟩ k hk' := by
-  simp [vertexAt, Walk.vertices, Walk.numEdges]
+  simp [vertexAt, Walk.vertices]
 
 lemma cast_steps {u v : Fin n} (h : u = v) (w : Walk G u t) :
     (h ▸ w).steps = w.steps := by subst h; rfl
@@ -204,7 +204,7 @@ lemma numEdges_takeSteps (k : ℕ) (w : Walk G s t) (hk : k ≤ w.numEdges) :
 
 lemma numEdges_dropSteps (j : ℕ) (w : Walk G s t) (hj : j ≤ w.numEdges) :
     (dropSteps j w hj).numEdges = w.numEdges - j := by
-  simp only [dropSteps, Walk.numEdges, List.length_drop, Nat.min_eq_left (by simpa [Walk.numEdges] using hj)]
+  simp only [dropSteps, Walk.numEdges, List.length_drop]
 
 lemma sum_take_add_sum_drop_le (l : List NNReal) {i j : ℕ} (hij : i ≤ j) :
     (l.take i).sum + (l.drop j).sum ≤ l.sum := by
@@ -249,7 +249,7 @@ theorem removeLoop_numEdges_lt {u : Fin n} (w : Walk G s u) {i j : ℕ}
     have hi' : i ≤ w.steps.length := by simpa [Walk.numEdges] using hi
     have hj' : j ≤ w.steps.length := by simpa [Walk.numEdges] using hj
     simp [removeLoop, Walk.append, takeSteps_steps, cast_dropSteps_steps w hi hj hdup,
-      List.length_append, List.length_take, List.length_drop, Walk.numEdges, min_eq_left hi', min_eq_left hj']
+      List.length_append, List.length_take, List.length_drop, Walk.numEdges, min_eq_left hi']
   rw [Walk.numEdges, hlen]
   omega
 
