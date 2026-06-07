@@ -14,6 +14,8 @@ What is currently proved without `sorry`:
 - `Sssp.Refine.refine_dijkstra_correct`: the operational CSR/Float/lazy-heap
   model matches the verified distance on every `ValidRustGraph`, **assuming**
   the bridge axioms below.
+- `Sssp.Refine.relaxOutEdges_eq_relaxCsrOut`: CSR out-edge relaxation order is
+  now proved by a permutation/counting argument, not trusted.
 - Fixture regressions: shared JSON examples agree between the Lean operational
   model and Rust tests.
 
@@ -61,14 +63,6 @@ Module: `formal/lean/Sssp/Refine/GraphBridge.lean`
 | Declaration | Why it is trusted now | Replacement direction |
 |-------------|-----------------------|-----------------------|
 | `outEdge_floatWeight_preimage` | States that every CSR slot produced by `fromEdgeList` stores some `floatWeight w`. | Prove directly from `RustGraph.fromEdgeList`, `mergeSort`, and the mapped edge list. |
-
-## Relax Bridge
-
-Module: `formal/lean/Sssp/Refine/RelaxBridge.lean`
-
-| Declaration | Why it is trusted now | Replacement direction |
-|-------------|-----------------------|-----------------------|
-| `relaxOutEdges_eq_relaxCsrOut` | Aligns CSR out-edge fold order with `Graph.outEdges`. | Prove that `relaxCsrOut` is permutation/order compatible with `relaxOutEdges`, or redefine one side to share the same order. |
 
 ## Heap Bridge
 

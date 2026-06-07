@@ -12,14 +12,14 @@ document Rust refinement for `src/dijkstra.rs`.
 | Step | Target | Module |
 |------|--------|--------|
 | 3c.1 | `nnrealToFloat_add_weight`, float order lemmas | `NumericBridge` |
-| 3c.2 | `relaxOutEdges_eq_relaxCsrOut` | `RelaxBridge` |
+| 3c.2 | `relaxOutEdges_eq_relaxCsrOut` | `RelaxBridge` — done |
 | 3c.3 | `outEdge_floatWeight_preimage` | `GraphBridge` |
 | 3c.4 | `dijkstraHeap_eq_dijkstraRelax` | `HeapBridge` |
 | 3c.5 | Rust ↔ `Refine.dijkstra` refinement note | `src/dijkstra.rs` |
 
 **Proved recently:** fixture `ValidRustGraph`, `nnrealToFloat_add_weight_ofNat`,
-single-edge and full-round float relax alignment, unconditional
-`refine_dijkstra_correct`.
+single-edge and full-round float relax alignment,
+`relaxOutEdges_eq_relaxCsrOut`, unconditional `refine_dijkstra_correct`.
 
 **Do not start Phase 4** until 3c is done or explicitly deferred.
 

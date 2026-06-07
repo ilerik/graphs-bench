@@ -2,8 +2,7 @@
   Sssp.Refine.RelaxBridge
 
   Align CSR `floatRelax*` with verified `relax*` on `csrToGraph` (Phase 3b/3c).
-  Edge alignment: `floatRelaxEdge_aligned` proved; out/full-round alignment
-  remains modulo `relaxOutEdges_eq_relaxCsrOut`.
+  Edge alignment, CSR out-edge alignment, and full-round alignment are proved.
 -/
 
 import Mathlib
@@ -409,7 +408,7 @@ private theorem graphOutEdges_toList_perm_csrOutEdgesFin (vg : ValidRustGraph n 
   rw [Multiset.coe_toList, graphOutEdges_count]
   exact (csrOutEdgesFin_count vg u x).symm
 
-/-- The remaining RelaxBridge obligation is now exactly CSR-list permutation. -/
+/-- CSR and `Graph.outEdges` relaxations agree when their edge lists are permutations. -/
 theorem relaxOutEdges_eq_relaxCsrOut_of_perm (vg : ValidRustGraph n g) (u : Fin n)
     (dHat : DistEstimate n)
     (hp : List.Perm (vg.toGraph.outEdges u).toList (csrOutEdgesFin vg u)) :
