@@ -168,6 +168,136 @@ private noncomputable def csrOutEdgesFin (vg : ValidRustGraph n g) (u : Fin n) :
     List (Fin n × NNReal) :=
   csrOutEdgesFinAux vg u 0 (g.outEdges u.val) (by simp)
 
+private theorem csrOutEdgesFinAux_length (vg : ValidRustGraph n g) (u : Fin n)
+    (idx : Nat) (edges : List (Nat × Float))
+    (hidx : idx + edges.length = (g.outEdges u.val).length) :
+    (csrOutEdgesFinAux vg u idx edges hidx).length = edges.length := by
+  induction edges generalizing idx with
+  | nil =>
+    simp [csrOutEdgesFinAux]
+  | cons _ xs ih =>
+    simp only [csrOutEdgesFinAux, List.length_cons]
+    exact congrArg Nat.succ (ih (idx + 1) (by rw [← hidx, List.length_cons]; omega))
+
+private theorem csrOutEdgesFin_length (vg : ValidRustGraph n g) (u : Fin n) :
+    (csrOutEdgesFin vg u).length = (g.outEdges u.val).length :=
+  csrOutEdgesFinAux_length vg u 0 (g.outEdges u.val) (by simp)
+
+private theorem graphOutEdges_card (vg : ValidRustGraph n g) (u : Fin n) :
+    (vg.toGraph.outEdges u).card = (g.outEdges u.val).length := by
+  dsimp [ValidRustGraph.toGraph, RustGraph.csrToGraph, Graph.outEdges]
+  rw [Multiset.card_bind]
+  simp only [Function.comp_apply, Multiset.coe_card, List.length_map]
+  exact RustGraph.sum_weightsToTarget_length g n vg.hwt vg.htgt vg.hdeg u
+
+private theorem count_map_prod_same {α β : Type} [DecidableEq α] [DecidableEq β]
+    (a : α) (l : List β) (b : β) :
+    Multiset.count (a, b) ((l.map (Prod.mk a) : List (α × β)) : Multiset (α × β)) =
+      Multiset.count b (l : Multiset β) := by
+  induction l with
+  | nil =>
+    simp
+  | cons c cs ih =>
+    rw [List.map_cons]
+    change Multiset.count (a, b)
+        ((a, c) ::ₘ ((cs.map (Prod.mk a) : List (α × β)) : Multiset (α × β))) =
+      Multiset.count b (c ::ₘ (cs : Multiset β))
+    rw [Multiset.count_cons, Multiset.count_cons]
+    by_cases h : b = c
+    · subst h
+      simp [ih]
+    · have hp : (a, b) ≠ (a, c) := by
+        intro he
+        exact h (congrArg Prod.snd he)
+      simp [hp, h, ih]
+
+private theorem count_map_prod_ne {α β : Type} [DecidableEq α] [DecidableEq β]
+    {a a' : α} (h : a' ≠ a) (l : List β) (b : β) :
+    Multiset.count (a, b) ((l.map (Prod.mk a') : List (α × β)) : Multiset (α × β)) = 0 := by
+  induction l with
+  | nil =>
+    simp
+  | cons c cs ih =>
+    rw [List.map_cons]
+    change Multiset.count (a, b)
+      ((a', c) ::ₘ ((cs.map (Prod.mk a') : List (α × β)) : Multiset (α × β))) = 0
+    rw [Multiset.count_cons]
+    have hp : (a, b) ≠ (a', c) := by
+      intro he
+      exact h (congrArg Prod.fst he).symm
+    simp [hp, ih]
+
+private theorem graphOutEdges_count (vg : ValidRustGraph n g) (u : Fin n)
+    (x : Fin n × NNReal) :
+    Multiset.count x (vg.toGraph.outEdges u) =
+      Multiset.count x.2 (Multiset.ofList (RustGraph.weightsToTarget g vg.hwt u.val x.1.val)) := by
+  classical
+  dsimp [ValidRustGraph.toGraph, RustGraph.csrToGraph, Graph.outEdges]
+  rw [Multiset.count_bind]
+  rw [Finset.sum_map_val]
+  rw [Finset.sum_eq_single x.1]
+  · exact count_map_prod_same x.1 (RustGraph.weightsToTarget g vg.hwt u.val x.1.val) x.2
+  · intro b _ hb
+    exact count_map_prod_ne hb (RustGraph.weightsToTarget g vg.hwt u.val b.val) x.2
+  · intro hx
+    exact absurd (Finset.mem_univ x.1) hx
+
+private theorem weightsSlot_count_eq_csrOutEdgeFin_count (vg : ValidRustGraph n g) (u : Fin n)
+    (x : Fin n × NNReal) (i : Nat) (hi : i < (g.outEdges u.val).length) :
+    Multiset.count x.2
+      (if ((g.outEdges u.val)[i]'hi).1 = x.1.val then
+        [nnrealWeight (vg.hwt.edgeWeight u.val i hi)]
+      else [] : List NNReal) =
+    Multiset.count x ({csrOutEdgeFin vg u i hi} : Multiset (Fin n × NNReal)) := by
+  by_cases ht : ((g.outEdges u.val)[i]'hi).1 = x.1.val
+  · rw [if_pos ht]
+    change Multiset.count x.2 ({nnrealWeight (vg.hwt.edgeWeight u.val i hi)} : Multiset NNReal) =
+      Multiset.count x ({csrOutEdgeFin vg u i hi} : Multiset (Fin n × NNReal))
+    rw [Multiset.count_singleton, Multiset.count_singleton]
+    by_cases hw : x.2 = nnrealWeight (vg.hwt.edgeWeight u.val i hi)
+    · have hx : x = csrOutEdgeFin vg u i hi := by
+        ext <;> simp [csrOutEdgeFin, ht, hw]
+      subst x
+      simp [csrOutEdgeFin]
+    · have hx : x ≠ csrOutEdgeFin vg u i hi := by
+        intro hx
+        apply hw
+        simpa [csrOutEdgeFin] using congrArg Prod.snd hx
+      simp [hw, hx]
+  · rw [if_neg ht]
+    change Multiset.count x.2 (0 : Multiset NNReal) =
+      Multiset.count x ({csrOutEdgeFin vg u i hi} : Multiset (Fin n × NNReal))
+    rw [Multiset.count_zero, Multiset.count_singleton]
+    have hx : x ≠ csrOutEdgeFin vg u i hi := by
+      intro hx
+      apply ht
+      have hv := congrArg (fun p : Fin n × NNReal => p.1.val) hx
+      simpa [csrOutEdgeFin] using hv.symm
+    simp [hx]
+
+private theorem csrOutEdgesFin_card_eq_graphOutEdges_card (vg : ValidRustGraph n g) (u : Fin n) :
+    (csrOutEdgesFin vg u : Multiset (Fin n × NNReal)).card = (vg.toGraph.outEdges u).card := by
+  rw [Multiset.coe_card, csrOutEdgesFin_length, graphOutEdges_card]
+
+private theorem csrOutEdgesFin_eq_nil_of_length (vg : ValidRustGraph n g) (u : Fin n)
+    (hlen : (g.outEdges u.val).length = 0) :
+    csrOutEdgesFin vg u = [] := by
+  have hout : g.outEdges u.val = [] := List.eq_nil_of_length_eq_zero hlen
+  simp [csrOutEdgesFin, csrOutEdgesFinAux, hout]
+
+private theorem csrOutEdgesFin_eq_singleton_of_length (vg : ValidRustGraph n g) (u : Fin n)
+    (hlen : (g.outEdges u.val).length = 1) (h0 : 0 < (g.outEdges u.val).length) :
+    csrOutEdgesFin vg u = [csrOutEdgeFin vg u 0 h0] := by
+  obtain ⟨a, hout⟩ := List.length_eq_one_iff.mp hlen
+  simp [csrOutEdgesFin, csrOutEdgesFinAux, hout]
+
+private theorem csrOutEdgesFin_eq_pair_of_length (vg : ValidRustGraph n g) (u : Fin n)
+    (hlen : (g.outEdges u.val).length = 2) (h0 : 0 < (g.outEdges u.val).length)
+    (h1 : 1 < (g.outEdges u.val).length) :
+    csrOutEdgesFin vg u = [csrOutEdgeFin vg u 0 h0, csrOutEdgeFin vg u 1 h1] := by
+  obtain ⟨a, b, hout⟩ := List.length_eq_two.mp hlen
+  simp [csrOutEdgesFin, csrOutEdgesFinAux, hout]
+
 /-- Relax CSR out-edges in index order (matches `floatRelaxOut`). -/
 private noncomputable def relaxCsrOutAux (vg : ValidRustGraph n g) (u : Fin n) (dHat : DistEstimate n)
     (idx : Nat) (edges : List (Nat × Float)) (hidx : idx + edges.length = (g.outEdges u.val).length) :
@@ -205,6 +335,79 @@ theorem relaxCsrOut_eq_foldl (vg : ValidRustGraph n g) (u : Fin n) (dHat : DistE
     relaxCsrOut vg u dHat =
       (csrOutEdgesFin vg u).foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat := by
   exact relaxCsrOutAux_eq_foldl vg u dHat 0 (g.outEdges u.val) (by simp)
+
+private theorem csrOutEdgesFin_count (vg : ValidRustGraph n g) (u : Fin n)
+    (x : Fin n × NNReal) :
+    Multiset.count x (csrOutEdgesFin vg u : Multiset (Fin n × NNReal)) =
+      Multiset.count x.2
+        (Multiset.ofList (RustGraph.weightsToTarget g vg.hwt u.val x.1.val)) := by
+  classical
+  have hle := vg.hdeg u
+  match hlen : (g.outEdges u.val).length, hle with
+  | 0, _ =>
+      rw [csrOutEdgesFin_eq_nil_of_length vg u hlen]
+      simp [RustGraph.weightsToTarget, hlen]
+  | 1, _ =>
+      have h0 : 0 < (g.outEdges u.val).length := by omega
+      rw [csrOutEdgesFin_eq_singleton_of_length vg u hlen h0]
+      simp [RustGraph.weightsToTarget, hlen]
+      simpa using (weightsSlot_count_eq_csrOutEdgeFin_count vg u x 0 h0).symm
+  | 2, _ =>
+      have h0 : 0 < (g.outEdges u.val).length := by omega
+      have h1 : 1 < (g.outEdges u.val).length := by omega
+      rw [csrOutEdgesFin_eq_pair_of_length vg u hlen h0 h1]
+      have hs0 := weightsSlot_count_eq_csrOutEdgeFin_count vg u x 0 h0
+      have hs1 := weightsSlot_count_eq_csrOutEdgeFin_count vg u x 1 h1
+      calc
+        Multiset.count x
+            (([csrOutEdgeFin vg u 0 h0, csrOutEdgeFin vg u 1 h1] : List (Fin n × NNReal)) :
+              Multiset (Fin n × NNReal))
+            =
+              Multiset.count x ({csrOutEdgeFin vg u 0 h0} : Multiset (Fin n × NNReal)) +
+                Multiset.count x ({csrOutEdgeFin vg u 1 h1} : Multiset (Fin n × NNReal)) := by
+                change Multiset.count x
+                    (csrOutEdgeFin vg u 0 h0 ::ₘ
+                      csrOutEdgeFin vg u 1 h1 ::ₘ (0 : Multiset (Fin n × NNReal))) =
+                  Multiset.count x ({csrOutEdgeFin vg u 0 h0} : Multiset (Fin n × NNReal)) +
+                    Multiset.count x ({csrOutEdgeFin vg u 1 h1} : Multiset (Fin n × NNReal))
+                rw [Multiset.count_cons, Multiset.count_cons, Multiset.count_zero,
+                  Multiset.count_singleton, Multiset.count_singleton]
+                omega
+        _ =
+              Multiset.count x.2
+                  (if ((g.outEdges u.val)[0]'h0).1 = x.1.val then
+                    [nnrealWeight (vg.hwt.edgeWeight u.val 0 h0)]
+                  else [] : List NNReal) +
+                Multiset.count x.2
+                  (if ((g.outEdges u.val)[1]'h1).1 = x.1.val then
+                    [nnrealWeight (vg.hwt.edgeWeight u.val 1 h1)]
+                  else [] : List NNReal) := by
+                rw [← hs0, ← hs1]
+        _ =
+              Multiset.count x.2
+                (Multiset.ofList (RustGraph.weightsToTarget g vg.hwt u.val x.1.val)) := by
+                have hweights :
+                    RustGraph.weightsToTarget g vg.hwt u.val x.1.val =
+                      ((if ((g.outEdges u.val)[0]'h0).1 = x.1.val then
+                          [nnrealWeight (vg.hwt.edgeWeight u.val 0 h0)]
+                        else []) ++
+                        (if ((g.outEdges u.val)[1]'h1).1 = x.1.val then
+                          [nnrealWeight (vg.hwt.edgeWeight u.val 1 h1)]
+                        else [] : List NNReal)) := by
+                  have hrange : List.range 2 = [0, 1] := by native_decide
+                  simp [RustGraph.weightsToTarget, hlen, hrange, beq_iff_eq]
+                rw [hweights, ← Multiset.coe_add, Multiset.count_add]
+  | len + 3, _ =>
+      omega
+
+private theorem graphOutEdges_toList_perm_csrOutEdgesFin (vg : ValidRustGraph n g) (u : Fin n) :
+    List.Perm (vg.toGraph.outEdges u).toList (csrOutEdgesFin vg u) := by
+  classical
+  rw [← Multiset.coe_eq_coe]
+  apply Multiset.ext.mpr
+  intro x
+  rw [Multiset.coe_toList, graphOutEdges_count]
+  exact (csrOutEdgesFin_count vg u x).symm
 
 /-- The remaining RelaxBridge obligation is now exactly CSR-list permutation. -/
 theorem relaxOutEdges_eq_relaxCsrOut_of_perm (vg : ValidRustGraph n g) (u : Fin n)
@@ -287,8 +490,10 @@ private theorem floatRelaxOut_relaxCsrOut_aligned (vg : ValidRustGraph n g) (u :
   exact floatRelaxOut_relaxCsrOutAux_aligned (vg := vg) u dHat dist hlen halign 0 (g.outEdges u.val)
     (by simp) (drop_zero (g.outEdges u.val)) x
 
-axiom relaxOutEdges_eq_relaxCsrOut (vg : ValidRustGraph n g) (u : Fin n) (dHat : DistEstimate n) :
-    relaxOutEdges vg.toGraph dHat u = relaxCsrOut vg u dHat
+theorem relaxOutEdges_eq_relaxCsrOut (vg : ValidRustGraph n g) (u : Fin n) (dHat : DistEstimate n) :
+    relaxOutEdges vg.toGraph dHat u = relaxCsrOut vg u dHat := by
+  exact relaxOutEdges_eq_relaxCsrOut_of_perm vg u dHat
+    (graphOutEdges_toList_perm_csrOutEdgesFin vg u)
 
 theorem floatRelaxOut_aligned (vg : ValidRustGraph n g) (dHat : DistEstimate n) (dist : List Float)
     (u : Fin n) (hlen : dist.length = n) (halign : ∀ x : Fin n, dist[x.val]! = nnrealToFloat (dHat x)) :
