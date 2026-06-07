@@ -3,6 +3,10 @@ name = "graphs-bench"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+description = "Rust benchmarks and Lean artifacts for directed single-source shortest paths"
+repository = "https://github.com/ilerik/graphs-bench"
+readme = "README.md"
+publish = false
 
 [dependencies]
 rand = "0.8"
