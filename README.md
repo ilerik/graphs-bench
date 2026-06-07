@@ -15,9 +15,13 @@ See [`ALGORITHM.md`](./ALGORITHM.md) for a detailed write-up of the algorithm
 (notation, parameters, the three sub-routines `FindPivots`, `BaseCase`,
 `BMSSP`, the partial-sorting data structure `D`, and the complexity analysis).
 
-For the **formal verification** in Lean 4 + Mathlib (a blueprint with every
-paper lemma stated; proofs in progress), see [`formal/`](./formal/). The
-arXiv article and its TeX source are vendored under
+For the **formal verification** in Lean 4 + Mathlib, see
+[`formal/`](./formal/). Current status: the repository contains a verified
+Lean Dijkstra algorithm and a Dijkstra refinement theorem for a CSR/Float
+model, but that refinement theorem still depends on trusted `axiom`
+declarations documented in [`formal/AXIOMS.md`](./formal/AXIOMS.md). The BMSSP
+paper primitives in Lean are currently specifications/oracles, not verified
+implementations. The arXiv article and its TeX source are vendored under
 [`formal/paper/`](./formal/paper/).
 
 ## Layout

@@ -3,6 +3,7 @@
 This document maps the **full verification path** from Rust executable code to
 the verified `Sssp.Algo` algorithm. Phase 3b closed the main functional theorem;
 this is the roadmap to **zero trusted axioms** and a **Rust refinement proof**.
+For the complete current trusted surface, see [`AXIOMS.md`](./AXIOMS.md).
 
 ## Layer diagram
 
@@ -48,9 +49,12 @@ theorem refine_dijkstra_correct (vg : ValidRustGraph n g) (s v : Fin n) :
   (dijkstra g s.val)[v.val]! = withTopNatToFloat (trueDistNat vg.toGraph s v)
 ```
 
-## Trusted axioms (elimination order)
+## Trusted Axioms (Elimination Order)
 
-Work in this order — each step unlocks the next:
+The current theorem stack is intentionally explicit about what remains trusted.
+Work in this order; each step unlocks the next. `AXIOMS.md` is the canonical
+inventory, while this section explains how those assumptions fit into the
+Dijkstra refinement proof.
 
 ### 1. Numeric bridge (`Sssp.Refine.NumericBridge`)
 
@@ -68,9 +72,11 @@ Work in this order — each step unlocks the next:
 | Item | Status |
 |------|--------|
 | `floatRelaxEdge_aligned_ne` (x ≠ target) | **Proved** |
-| `floatRelaxEdge_aligned` (target vertex) | Axiom — needs `nnrealToFloat_min` + tgt case |
-| `floatRelaxOut_aligned` | Axiom — CSR vs `Graph.outEdges` fold order |
-| `foldl_range_floatRelaxAll_aligned` | Axiom — induction on `List.range` |
+| `floatRelaxEdge_aligned_v` (target vertex) | **Proved** via numeric bridge assumptions |
+| `floatRelaxEdge_aligned` | **Proved** |
+| `floatRelaxOut_aligned` | **Proved modulo** `relaxOutEdges_eq_relaxCsrOut` |
+| `relaxOutEdges_eq_relaxCsrOut` | **Axiom** — CSR order vs `Graph.outEdges` order |
+| `foldl_range_floatRelaxAll_aligned` | **Axiom** — induction over `List.range` still pending |
 
 Length lemmas are already proved.
 

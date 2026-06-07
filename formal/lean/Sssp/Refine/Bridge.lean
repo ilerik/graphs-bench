@@ -2,8 +2,9 @@
   Sssp.Refine.Bridge
 
   Align CSR `RustGraph` topology with verified `Graph n` on shared fixture
-  edge lists.  **Regression checks only** — the general bridge for all inputs
-  is Phase 3b; see `formal/FUTURE_WORK.md`.
+  edge lists.  **Regression checks only** — the general bridge for all valid
+  inputs lives in `Sssp.Refine.GraphBridge`; trusted assumptions are tracked in
+  `formal/AXIOMS.md`.
 -/
 
 import Mathlib

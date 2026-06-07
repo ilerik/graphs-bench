@@ -7,7 +7,7 @@ Mathlib**, the algorithms implemented in `../src/`.  Target paper:
 > *Breaking the Sorting Barrier for Directed Single-Source Shortest Paths.*
 > arXiv:[2504.17033v2](https://arxiv.org/abs/2504.17033) (July 2025).
 
-## ⚠️ Honest verification status (as of Phase 0 of the roadmap)
+## Honest Verification Status
 
 The Lean code in `lean/` compiles without `sorry`, but **most of the
 algorithmic content is not yet verified**.  The current architecture is a
@@ -21,6 +21,14 @@ algorithmic content is not yet verified**.  The current architecture is a
 * `Sssp.Algo.<X>`      — *real, computable, verified* implementation of
   `<X>`, proved to satisfy `<X>Spec_correct`.  This is where actual
   algorithmic content lives.
+
+The strongest current all-input theorem is the Dijkstra refinement theorem
+`Sssp.Refine.refine_dijkstra_correct`, which connects the operational
+CSR/Float/lazy-heap model to the verified `Sssp.Algo.Dijkstra` distance on
+every `ValidRustGraph`. This theorem is a useful milestone, but it is **not
+yet a zero-trust proof**: it still depends on trusted `axiom` declarations in
+the numeric, CSR-order, and heap-simulation bridges. See
+[`AXIOMS.md`](./AXIOMS.md) for the exact trusted surface.
 
 | Module             | Status                                          | Algorithmic content       |
 |--------------------|-------------------------------------------------|---------------------------|
@@ -36,6 +44,11 @@ algorithmic content is not yet verified**.  The current architecture is a
 | `Sssp.Algo.Dijkstra` | **Verified (Phase 3, complete).** `dijkstra_correct` | `n`-round relaxation      |
 | `Sssp.Refine.Dijkstra` | Operational Float/CSR/lazy-heap model + step lemmas   | mirrors `src/dijkstra.rs` |
 | `Sssp.Refine.Bridge` | CSR ↔ graph checks on fixtures (**regression only**)  | —                         |
+| `Sssp.Refine.GraphBridge` | CSR → `Graph n` bridge for nat-weighted valid graphs | partial, one trusted preimage axiom |
+| `Sssp.Refine.NumericBridge` | `WithTop NNReal`/nat distances → `Float` bridge | partial, trusted float facts |
+| `Sssp.Refine.RelaxBridge` | Aligns float relax rounds with verified relax rounds | partial, trusted fold/order axioms |
+| `Sssp.Refine.HeapBridge` | Connects lazy heap Dijkstra to relax-round model | trusted heap axiom + fixture checks |
+| `Sssp.Refine.RefineCorrectness` | Phase 3b theorem API | proved from the bridge axioms |
 | `Sssp.Fixtures.*`    | `#guard` / CI regression (**not the proof target**)   | —                         |
 | `Sssp.Algo.DStruct`  | TBD (Phase 4).                                  | block-list with amortised costs |
 | `Sssp.Algo.FindPivots` | TBD (Phase 5).                                | k-round Bellman-Ford      |
@@ -56,6 +69,9 @@ operation from `Sssp.<X>` (oracle) to `Sssp.Algo.<X>` (real).
 ```
 formal/
 ├── README.md                  ← this file: verification plan
+├── AXIOMS.md                  ← trusted Lean assumptions and elimination plan
+├── VERIFICATION.md            ← Dijkstra refinement stack
+├── FUTURE_WORK.md             ← next milestones
 ├── paper/
 │   ├── 2504.17033v2.pdf       ← the article (17 pp. PDF)
 │   ├── 2504.17033.tar.gz      ← arXiv TeX source archive
@@ -76,8 +92,16 @@ formal/
         ├── BaseCase.lean      ← spec only
         ├── BMSSP.lean         ← spec only
         ├── Main.lean          ← spec only
-        └── Algo/
-            └── Dijkstra.lean  ← real verified Dijkstra (computable)
+        ├── Algo/
+        │   └── Dijkstra.lean  ← real verified Dijkstra (computable)
+        └── Refine/
+            ├── Dijkstra.lean  ← operational CSR/Float/heap model
+            ├── GraphBridge.lean
+            ├── NumericBridge.lean
+            ├── RelaxBridge.lean
+            ├── HeapBridge.lean
+            ├── RefineCorrectness.lean
+            └── Verification.lean
 ```
 
 ## Building
@@ -111,7 +135,8 @@ dependency, so the natural order of attack is bottom-up:
 | 1     | Foundation hardening (`Walk`, `Distance`, log conventions)            | 1 week      |
 | 2     | Cost-counting monad `CostM`                                           | 2 weeks     |
 | 3     | `Sssp.Algo.Dijkstra`: verified relaxation + Refine model + fixtures | done        |
-| 3b    | **Dijkstra refinement: Refine ≡ Algo for all inputs** (gate)          | in progress |
+| 3b    | **Dijkstra refinement API: Refine ≡ Algo on `ValidRustGraph`**         | done, uses bridge axioms |
+| 3c    | Remove trusted Dijkstra bridge axioms + document Rust refinement       | current priority |
 | 4     | `Sssp.Algo.DStruct`: block-list, amortised costs                       | *deferred*  |
 | 5     | `Sssp.Algo.FindPivots`: Bellman-Ford + Lemma 3.2                       | *deferred*  |
 | 6     | `Sssp.Algo.BaseCase`: bounded mini-Dijkstra + Lemma 3.1 base           | *deferred*  |
@@ -140,18 +165,24 @@ discharged in Phase 7.
 | `Sssp.BMSSP`               | Algorithm 3 + Lemmas 3.1, 3.10 — spec only; Lemma 3.12 absent | `bmssp` (bmssp.rs)   |
 | `Sssp.Main`                | "Top-level call" (`main_result.tex` line 47) — spec only  | `sssp_bmssp` (bmssp.rs)  |
 
-## Phase 3 (Dijkstra) and Phase 3b (refinement gate)
+## Phase 3 (Dijkstra), Phase 3b, and Phase 3c
 
 **Done (Phase 3):** verified `Sssp.Algo.dijkstra` (`dijkstra_correct`), operational
 `Sssp.Refine.dijkstra`, fixture regression (`Sssp.Fixtures.*`, CI, Rust tests).
 
-**Next (Phase 3b — blocks Phase 4+):** prove Refine ≡ Algo for **all inputs**
-(general `RustGraph` → `Graph n` bridge + simulation proof).  See
-`formal/FUTURE_WORK.md` for the proof plan.  No new paper-module proofs until
-this lands.
+**Done as an API theorem (Phase 3b):** `Sssp.Refine.refine_dijkstra_correct`
+states that operational `Refine.dijkstra` matches the verified distance on
+every `ValidRustGraph`.
 
-Fixtures remain a regression harness only; passing CI does not close Phase 3b.
-Run `./formal/scripts/check-fixtures.sh` while refinement work is in progress.
+**Current priority (Phase 3c):** remove the trusted bridge axioms listed in
+[`AXIOMS.md`](./AXIOMS.md), then document or prove the Rust
+`src/dijkstra.rs` refinement against the Lean operational model. No new
+BMSSP paper-module proofs should start until Phase 3c is done or explicitly
+deferred.
+
+Fixtures remain a regression harness only; passing CI does not replace the
+all-input proof obligations. Run `./formal/scripts/check-fixtures.sh` while
+refinement work is in progress.
 
 ## Re-fetching the paper
 

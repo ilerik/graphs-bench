@@ -2,8 +2,9 @@
 
 ## Current priority: Phase 3c — zero axioms for Dijkstra
 
-Phase 3b is **done**: `refine_dijkstra_correct` on every `ValidRustGraph`.
-See `formal/VERIFICATION.md` for the full stack diagram and elimination order.
+Phase 3b is **done as a theorem API**: `refine_dijkstra_correct` on every
+`ValidRustGraph`. It is not zero-trust yet; see `formal/AXIOMS.md` for the
+trusted declarations and `formal/VERIFICATION.md` for the full stack diagram.
 
 **Phase 3c goal:** replace all trusted axioms in the Dijkstra proof chain, then
 document Rust refinement for `src/dijkstra.rs`.
@@ -11,13 +12,13 @@ document Rust refinement for `src/dijkstra.rs`.
 | Step | Target | Module |
 |------|--------|--------|
 | 3c.1 | `nnrealToFloat_add_weight`, float order lemmas | `NumericBridge` |
-| 3c.2 | `floatRelax*_aligned` (3 axioms) | `RelaxBridge` |
+| 3c.2 | `relaxOutEdges_eq_relaxCsrOut`, `foldl_range_floatRelaxAll_aligned` | `RelaxBridge` |
 | 3c.3 | `outEdge_floatWeight_preimage` | `GraphBridge` |
 | 3c.4 | `dijkstraHeap_eq_dijkstraRelax` | `HeapBridge` |
 | 3c.5 | Rust ↔ `Refine.dijkstra` refinement note | `src/dijkstra.rs` |
 
 **Proved recently:** fixture `ValidRustGraph`, `nnrealToFloat_add_weight_ofNat`,
-`floatRelaxEdge_aligned_ne`, unconditional `refine_dijkstra_correct`.
+single-edge float relax alignment, unconditional `refine_dijkstra_correct`.
 
 **Do not start Phase 4** until 3c is done or explicitly deferred.
 

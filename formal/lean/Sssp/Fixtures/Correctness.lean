@@ -30,8 +30,8 @@ theorem refine_dijkstra_all_fixtures :
   Phase 3 regression summary (fixtures only).
 
   This module records what CI checks; it is **not** the all-inputs refinement
-  proof.  Phase 3b (Refine ≡ Algo for every valid input) is the gate before
-  Phase 4+ — see `formal/FUTURE_WORK.md`.
+  proof.  The Phase 3b theorem API now lives in `Sssp.Refine.RefineCorrectness`;
+  its remaining trusted assumptions are tracked in `formal/AXIOMS.md`.
 -/
 
 end Fixtures
