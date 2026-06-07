@@ -50,9 +50,110 @@ lemma relaxEdge_source (dHat : DistEstimate n) (u v : Fin n) (w : NNReal) :
   · have h' : u ≠ v := fun huv => h huv.symm
     simp [relaxEdge, Function.update, h']
 
+/-- Folding relaxations over edges from one source leaves that source estimate unchanged. -/
+lemma foldl_relaxEdges_source (dHat : DistEstimate n) (u : Fin n)
+    (l : List (Fin n × NNReal)) :
+    (l.foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat) u = dHat u := by
+  induction l generalizing dHat with
+  | nil => rfl
+  | cons p xs ih =>
+    calc
+      (xs.foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2)
+          (relaxEdge dHat u p.1 p.2)) u
+          = (relaxEdge dHat u p.1 p.2) u := ih (relaxEdge dHat u p.1 p.2)
+      _ = dHat u := relaxEdge_source dHat u p.1 p.2
+
+private lemma relaxEdge_same_target_comm (dHat : DistEstimate n) (u a : Fin n)
+    (wa wb : NNReal) :
+    relaxEdge (relaxEdge dHat u a wa) u a wb =
+      relaxEdge (relaxEdge dHat u a wb) u a wa := by
+  funext x
+  by_cases hx : x = a
+  · subst x
+    have hsrc1 : (relaxEdge dHat u a wa) u = dHat u := relaxEdge_source dHat u a wa
+    have hsrc2 : (relaxEdge dHat u a wb) u = dHat u := relaxEdge_source dHat u a wb
+    calc
+      relaxEdge (relaxEdge dHat u a wa) u a wb a
+          = min ((relaxEdge dHat u a wa) a) ((relaxEdge dHat u a wa) u + ↑wb) := by
+            simp [relaxEdge, Function.update]
+      _ = min (min (dHat a) (dHat u + ↑wa)) (dHat u + ↑wb) := by
+            rw [hsrc1]
+            simp [relaxEdge, Function.update]
+      _ = min (min (dHat a) (dHat u + ↑wb)) (dHat u + ↑wa) := by
+            ac_rfl
+      _ = min ((relaxEdge dHat u a wb) a) ((relaxEdge dHat u a wb) u + ↑wa) := by
+            rw [hsrc2]
+            simp [relaxEdge, Function.update]
+      _ = relaxEdge (relaxEdge dHat u a wb) u a wa a := by
+            simp [relaxEdge, Function.update]
+  · simp [relaxEdge, Function.update, hx]
+
+private lemma relaxEdge_diff_target_comm (dHat : DistEstimate n) (u a b : Fin n)
+    (wa wb : NNReal) (hab : a ≠ b) :
+    relaxEdge (relaxEdge dHat u a wa) u b wb =
+      relaxEdge (relaxEdge dHat u b wb) u a wa := by
+  funext x
+  by_cases hxa : x = a
+  · subst x
+    have hsrc : (relaxEdge dHat u b wb) u = dHat u := relaxEdge_source dHat u b wb
+    have hget : (relaxEdge dHat u b wb) a = dHat a := by
+      simp [relaxEdge, Function.update, hab]
+    calc
+      relaxEdge (relaxEdge dHat u a wa) u b wb a
+          = (relaxEdge dHat u a wa) a := by
+            simp [relaxEdge, Function.update, hab]
+      _ = min (dHat a) (dHat u + ↑wa) := by
+            simp [relaxEdge, Function.update]
+      _ = min ((relaxEdge dHat u b wb) a) ((relaxEdge dHat u b wb) u + ↑wa) := by
+            rw [hget, hsrc]
+      _ = relaxEdge (relaxEdge dHat u b wb) u a wa a := by
+            simp [relaxEdge, Function.update]
+  · by_cases hxb : x = b
+    · subst x
+      have hsrc : (relaxEdge dHat u a wa) u = dHat u := relaxEdge_source dHat u a wa
+      have hget : (relaxEdge dHat u a wa) b = dHat b := by
+        simp [relaxEdge, Function.update, hxa]
+      calc
+        relaxEdge (relaxEdge dHat u a wa) u b wb b
+            = min ((relaxEdge dHat u a wa) b) ((relaxEdge dHat u a wa) u + ↑wb) := by
+              simp [relaxEdge, Function.update]
+        _ = min (dHat b) (dHat u + ↑wb) := by
+              rw [hget, hsrc]
+        _ = (relaxEdge dHat u b wb) b := by
+              simp [relaxEdge, Function.update]
+        _ = relaxEdge (relaxEdge dHat u b wb) u a wa b := by
+              simp [relaxEdge, Function.update, hxa]
+    · simp [relaxEdge, Function.update, hxa, hxb]
+
+/-- Relaxing two edges out of the same source is order-independent. -/
+lemma relaxEdge_right_comm (dHat : DistEstimate n) (u a b : Fin n) (wa wb : NNReal) :
+    relaxEdge (relaxEdge dHat u a wa) u b wb =
+      relaxEdge (relaxEdge dHat u b wb) u a wa := by
+  by_cases hab : a = b
+  · subst b
+    exact relaxEdge_same_target_comm dHat u a wa wb
+  · exact relaxEdge_diff_target_comm dHat u a b wa wb hab
+
+instance (u : Fin n) :
+    RightCommutative (fun dHat' (p : Fin n × NNReal) => relaxEdge dHat' u p.1 p.2) where
+  right_comm dHat p q := relaxEdge_right_comm dHat u p.1 q.1 p.2 q.2
+
+/-- Relaxing a permuted list of edges out of one source gives the same estimate. -/
+lemma foldl_relaxEdges_perm (dHat : DistEstimate n) (u : Fin n)
+    {l₁ l₂ : List (Fin n × NNReal)} (hp : List.Perm l₁ l₂) :
+    l₁.foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat =
+      l₂.foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat :=
+  List.Perm.foldl_eq hp dHat
+
 /-- Relax all out-edges of `u`. -/
 noncomputable def relaxOutEdges (G : Graph n) (dHat : DistEstimate n) (u : Fin n) : DistEstimate n :=
   (G.outEdges u).toList.foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat
+
+/-- Relaxing all outgoing edges leaves the source estimate unchanged. -/
+lemma relaxOutEdges_source (dHat : DistEstimate n) (u : Fin n) :
+    relaxOutEdges G dHat u u = dHat u := by
+  unfold relaxOutEdges
+  exact foldl_relaxEdges_source dHat u (G.outEdges u).toList
 
 lemma mem_outEdges_iff {u v : Fin n} {w : NNReal} :
     (v, w) ∈ G.outEdges u ↔ w ∈ G.edges u v := by
