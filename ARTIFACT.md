@@ -33,10 +33,12 @@ Recommended checks before publishing or archiving:
 
 ```bash
 cd formal/lean
-lake build Sssp.Refine.Verification
+lake build Sssp.Refine.Verification Sssp.Fixtures.Correctness
 
 cd ../..
 ./formal/scripts/check-fixtures.sh
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
 cargo test --release
 ```
 

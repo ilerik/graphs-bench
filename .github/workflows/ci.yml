@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, publication-prep]
   pull_request:
 
 jobs:
@@ -20,10 +20,18 @@ jobs:
         run: |
           cd formal/lean
           lake exe cache get
-          lake build Sssp.Fixtures.Correctness
+          lake build Sssp.Refine.Verification Sssp.Fixtures.Correctness
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.85.0
+        with:
+          components: rustfmt, clippy
 
-      - name: Rust fixture tests
-        run: cargo test shared_json_fixtures
+      - name: Rust format
+        run: cargo fmt --check
+
+      - name: Rust clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --release
