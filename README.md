@@ -24,9 +24,9 @@ paper primitives in Lean are currently specifications/oracles, not verified
 implementations. The arXiv article and its TeX source are vendored under
 [`formal/paper/`](./formal/paper/).
 
-For publication/archival notes, see [`ARTIFACT.md`](./ARTIFACT.md). Citation
-metadata is provided in [`CITATION.cff`](./CITATION.cff); no project license has
-been selected yet.
+For publication/archival notes, see [`ARTIFACT.md`](./ARTIFACT.md) and
+[`ARCHIVE_ORG.md`](./ARCHIVE_ORG.md). Citation metadata is provided in
+[`CITATION.cff`](./CITATION.cff); no project license has been selected yet.
 
 ## Layout
 

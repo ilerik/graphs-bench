@@ -7,6 +7,8 @@ the directed single-source shortest path algorithm from:
 > *Breaking the Sorting Barrier for Directed Single-Source Shortest Paths.*
 > arXiv:2504.17033v2.
 
+For Archive.org upload metadata, see [`ARCHIVE_ORG.md`](./ARCHIVE_ORG.md).
+
 ## What This Artifact Contains
 
 - Rust implementations and benchmarks in `src/`.
