@@ -151,6 +151,23 @@ noncomputable def csrOutEdgeFin (vg : ValidRustGraph n g) (u : Fin n) (i : Nat)
   let p := (g.outEdges u.val)[i]'hi
   (⟨p.1, vg.htgt u p (List.getElem_mem hi)⟩, nnrealWeight (vg.hwt.edgeWeight u.val i hi))
 
+/-- CSR out-edges as verified edge pairs, preserving CSR index order. -/
+private noncomputable def csrOutEdgesFinAux (vg : ValidRustGraph n g) (u : Fin n)
+    (idx : Nat) (edges : List (Nat × Float))
+    (hidx : idx + edges.length = (g.outEdges u.val).length) : List (Fin n × NNReal) :=
+  match edges with
+  | [] => []
+  | _ :: xs =>
+    have hi : idx < (g.outEdges u.val).length := by
+      rw [← hidx, List.length_cons]; omega
+    have hidx' : (idx + 1) + xs.length = (g.outEdges u.val).length := by
+      rw [← hidx, List.length_cons]; omega
+    csrOutEdgeFin vg u idx hi :: csrOutEdgesFinAux vg u (idx + 1) xs hidx'
+
+private noncomputable def csrOutEdgesFin (vg : ValidRustGraph n g) (u : Fin n) :
+    List (Fin n × NNReal) :=
+  csrOutEdgesFinAux vg u 0 (g.outEdges u.val) (by simp)
+
 /-- Relax CSR out-edges in index order (matches `floatRelaxOut`). -/
 private noncomputable def relaxCsrOutAux (vg : ValidRustGraph n g) (u : Fin n) (dHat : DistEstimate n)
     (idx : Nat) (edges : List (Nat × Float)) (hidx : idx + edges.length = (g.outEdges u.val).length) :
@@ -167,6 +184,35 @@ private noncomputable def relaxCsrOutAux (vg : ValidRustGraph n g) (u : Fin n) (
 noncomputable def relaxCsrOut (vg : ValidRustGraph n g) (u : Fin n) (dHat : DistEstimate n) :
     DistEstimate n :=
   relaxCsrOutAux vg u dHat 0 (g.outEdges u.val) (by simp)
+
+private theorem relaxCsrOutAux_eq_foldl (vg : ValidRustGraph n g) (u : Fin n)
+    (dHat : DistEstimate n) (idx : Nat) (edges : List (Nat × Float))
+    (hidx : idx + edges.length = (g.outEdges u.val).length) :
+    relaxCsrOutAux vg u dHat idx edges hidx =
+      (csrOutEdgesFinAux vg u idx edges hidx).foldl
+        (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat := by
+  induction edges generalizing dHat idx with
+  | nil =>
+    simp [relaxCsrOutAux, csrOutEdgesFinAux]
+  | cons edge xs ih =>
+    simp only [relaxCsrOutAux, csrOutEdgesFinAux, List.foldl_cons]
+    exact ih (relaxEdge dHat u
+      (csrOutEdgeFin vg u idx (by rw [← hidx, List.length_cons]; omega)).1
+      (csrOutEdgeFin vg u idx (by rw [← hidx, List.length_cons]; omega)).2)
+      (idx + 1) (by rw [← hidx, List.length_cons]; omega)
+
+theorem relaxCsrOut_eq_foldl (vg : ValidRustGraph n g) (u : Fin n) (dHat : DistEstimate n) :
+    relaxCsrOut vg u dHat =
+      (csrOutEdgesFin vg u).foldl (fun dHat' p => relaxEdge dHat' u p.1 p.2) dHat := by
+  exact relaxCsrOutAux_eq_foldl vg u dHat 0 (g.outEdges u.val) (by simp)
+
+/-- The remaining RelaxBridge obligation is now exactly CSR-list permutation. -/
+theorem relaxOutEdges_eq_relaxCsrOut_of_perm (vg : ValidRustGraph n g) (u : Fin n)
+    (dHat : DistEstimate n)
+    (hp : List.Perm (vg.toGraph.outEdges u).toList (csrOutEdgesFin vg u)) :
+    relaxOutEdges vg.toGraph dHat u = relaxCsrOut vg u dHat := by
+  rw [relaxOutEdges, relaxCsrOut_eq_foldl]
+  exact foldl_relaxEdges_perm dHat u hp
 
 private lemma mem_edges_of_csrOutEdgeFin (vg : ValidRustGraph n g) (u v : Fin n) (i : Nat)
     (hi : i < (g.outEdges u.val).length)
