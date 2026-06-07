@@ -444,10 +444,7 @@ mod tests {
     fn diamond_with_ties() {
         // Path 0→1→3 has length 2, path 0→2→3 has length 2: a tie. Both
         // algorithms should agree (Dijkstra picks one canonical path).
-        let g = Graph::from_edges(
-            4,
-            &[(0, 1, 1.0), (0, 2, 1.0), (1, 3, 1.0), (2, 3, 1.0)],
-        );
+        let g = Graph::from_edges(4, &[(0, 1, 1.0), (0, 2, 1.0), (1, 3, 1.0), (2, 3, 1.0)]);
         let d_bmssp = sssp_bmssp(&g, 0);
         let d_dij = dijkstra(&g, 0);
         assert_distances_match(&d_bmssp, &d_dij);
@@ -457,10 +454,7 @@ mod tests {
     fn unreachable_vertices() {
         // Two disconnected components: 0→1→2 and isolated 3→4.
         // Vertices 3 and 4 are unreachable from source 0.
-        let g = Graph::from_edges(
-            5,
-            &[(0, 1, 1.0), (1, 2, 2.0), (3, 4, 1.0)],
-        );
+        let g = Graph::from_edges(5, &[(0, 1, 1.0), (1, 2, 2.0), (3, 4, 1.0)]);
         let d_bmssp = sssp_bmssp(&g, 0);
         let d_dij = dijkstra(&g, 0);
         assert_distances_match(&d_bmssp, &d_dij);

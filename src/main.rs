@@ -118,14 +118,7 @@ fn print_header() {
     // predicted asymptotic is tight), and a per-edge time for Dijkstra.
     println!(
         "{:>9}  {:>10}  {:>3}  {:>11}  {:>11}  {:>7}  {:>11}  {:>11}  match",
-        "n",
-        "m",
-        "L",
-        "Dijkstra",
-        "BMSSP",
-        "ratio",
-        "ratio·log^⅓",
-        "Dij ns/edge",
+        "n", "m", "L", "Dijkstra", "BMSSP", "ratio", "ratio·log^⅓", "Dij ns/edge",
     );
     println!("{}", "-".repeat(102));
 }
@@ -171,18 +164,8 @@ fn main() {
     // Sparse only: BMSSP's asymptotic edge over Dijkstra (a factor of
     // log^{1/3} n on n log n) is most visible when m = O(n).
     let sparse_sizes = [
-        1_000usize,
-        3_000,
-        10_000,
-        30_000,
-        100_000,
-        300_000,
-        1_000_000,
-        1_500_000,
-        2_000_000,
-        2_500_000,
-        3_000_000,
-        4_000_000,
+        1_000usize, 3_000, 10_000, 30_000, 100_000, 300_000, 1_000_000, 1_500_000, 2_000_000,
+        2_500_000, 3_000_000, 4_000_000,
     ];
     run_sweep(
         "Sparse  (avg out-degree = 4,  m = 4n)",

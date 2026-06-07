@@ -41,7 +41,10 @@ pub fn dijkstra(g: &Graph, source: usize) -> Vec<f64> {
     let mut dist = vec![f64::INFINITY; g.n];
     dist[source] = 0.0;
     let mut heap: BinaryHeap<HeapItem> = BinaryHeap::with_capacity(g.n);
-    heap.push(HeapItem { d: 0.0, v: source as u32 });
+    heap.push(HeapItem {
+        d: 0.0,
+        v: source as u32,
+    });
     while let Some(HeapItem { d, v }) = heap.pop() {
         let v_us = v as usize;
         if d > dist[v_us] {
@@ -105,6 +108,10 @@ mod fixture_tests {
             "formal/fixtures/dijkstra/single_vertex.json",
         ] {
             let fx = load_fixture(path);
+            assert!(
+                !fx.name.is_empty(),
+                "fixture name should not be empty: {path}"
+            );
             let edges: Vec<(u32, u32, f64)> = fx.edges;
             let g = Graph::from_edges(fx.n, &edges);
             let got = dijkstra(&g, fx.source);

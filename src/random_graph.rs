@@ -1,9 +1,9 @@
 //! Random graph generators producing instances that are guaranteed connected
 //! from vertex 0 (so the SSSP problem is well-defined for every vertex).
 
-use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 use rand::SeedableRng;
+use rand::distributions::{Distribution, Standard};
 use rand_chacha::ChaCha8Rng;
 
 use crate::graph::Graph;

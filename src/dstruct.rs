@@ -116,10 +116,7 @@ impl DStruct {
         let mid = items.len() / 2;
         let upper_half: Vec<(u32, f64)> = items.split_off(mid);
         let lower_half = items;
-        let lower_upper = lower_half
-            .last()
-            .map(|x| x.1)
-            .unwrap_or(f64::NEG_INFINITY);
+        let lower_upper = lower_half.last().map(|x| x.1).unwrap_or(f64::NEG_INFINITY);
         self.d1[idx] = Block {
             items: lower_half,
             upper: lower_upper,
@@ -166,13 +163,19 @@ impl DStruct {
                 .iter()
                 .map(|x| x.1)
                 .fold(f64::NEG_INFINITY, f64::max);
-            self.d0.insert(0, Block { items: filtered, upper });
+            self.d0.insert(
+                0,
+                Block {
+                    items: filtered,
+                    upper,
+                },
+            );
             return;
         }
 
         // Split into chunks of ⌈m/2⌉ following the paper.
         filtered.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-        let chunk = ((self.m + 1) / 2).max(1);
+        let chunk = self.m.div_ceil(2).max(1);
         let mut new_blocks: Vec<Block> = Vec::with_capacity(filtered.len() / chunk + 1);
         for slice in filtered.chunks(chunk) {
             let items = slice.to_vec();
@@ -181,7 +184,7 @@ impl DStruct {
         }
         // Prepend in order (block 0 of new_blocks has the smallest values).
         let mut combined = new_blocks;
-        combined.extend(self.d0.drain(..));
+        combined.append(&mut self.d0);
         self.d0 = combined;
     }
 
@@ -218,7 +221,8 @@ impl DStruct {
         }
 
         // 0 = came from D0, 1 = came from D1.
-        let mut combined: Vec<(u32, f64, u8, usize, usize)> = Vec::with_capacity(s0.len() + s1.len());
+        let mut combined: Vec<(u32, f64, u8, usize, usize)> =
+            Vec::with_capacity(s0.len() + s1.len());
         for (k, v, b, i) in s0 {
             combined.push((k, v, 0, b, i));
         }
@@ -248,8 +252,10 @@ impl DStruct {
 
         // Remove the selected items from their original blocks (swap-remove
         // keeps blocks intact; per-block within-block order doesn't matter).
-        let mut per_block_removes_d0: Vec<Vec<usize>> = (0..consumed_d0).map(|_| Vec::new()).collect();
-        let mut per_block_removes_d1: Vec<Vec<usize>> = (0..consumed_d1).map(|_| Vec::new()).collect();
+        let mut per_block_removes_d0: Vec<Vec<usize>> =
+            (0..consumed_d0).map(|_| Vec::new()).collect();
+        let mut per_block_removes_d1: Vec<Vec<usize>> =
+            (0..consumed_d1).map(|_| Vec::new()).collect();
         for &(k, _, src, b, i) in &selected {
             self.best.remove(&k);
             if src == 0 {
