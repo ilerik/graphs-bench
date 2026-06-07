@@ -45,6 +45,17 @@ cargo test --release
 Expected result: all commands complete successfully. Lean may emit existing
 linter warnings about unused simp arguments; those warnings are not proof gaps.
 
+## Building A Source Archive
+
+Create a tarball from tracked Git files:
+
+```bash
+./scripts/make-archive.sh
+```
+
+The script writes `dist/graphs-bench-<short-sha>.tar.gz` and a matching
+`.sha256` checksum file.
+
 ## Suggested Archive Contents
 
 Include:

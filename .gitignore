@@ -1,4 +1,5 @@
 /target
+/dist
 
 # Lean / Lake build artefacts (formal verification project under formal/lean/)
 formal/lean/.lake/
