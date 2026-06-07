@@ -47,7 +47,7 @@ the numeric and heap-simulation bridges. See
 | `Sssp.Refine.GraphBridge` | CSR → `Graph n` bridge for nat-weighted valid graphs | proved preimage/counting bridge |
 | `Sssp.Refine.NumericBridge` | `WithTop NNReal`/nat distances → `Float` bridge | partial, trusted float facts |
 | `Sssp.Refine.RelaxBridge` | Aligns float relax rounds with verified relax rounds | proved, depends on numeric bridge assumptions |
-| `Sssp.Refine.HeapBridge` | Connects lazy heap Dijkstra to relax-round model | trusted heap axiom + fixture checks |
+| `Sssp.Refine.HeapBridge` | Connects lazy heap Dijkstra to relax-round model | trusted heap axiom + proved length invariants + fixture checks |
 | `Sssp.Refine.RefineCorrectness` | Phase 3b theorem API | proved from the bridge axioms |
 | `Sssp.Fixtures.*`    | `#guard` / CI regression (**not the proof target**)   | —                         |
 | `Sssp.Algo.DStruct`  | TBD (Phase 4).                                  | block-list with amortised costs |

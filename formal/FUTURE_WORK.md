@@ -20,6 +20,7 @@ document Rust refinement for `src/dijkstra.rs`.
 **Proved recently:** fixture `ValidRustGraph`, `nnrealToFloat_add_weight_ofNat`,
 single-edge and full-round float relax alignment,
 `relaxOutEdges_eq_relaxCsrOut`, `outEdge_floatWeight_preimage`,
+heap distance-vector length preservation,
 unconditional `refine_dijkstra_correct`.
 
 **Do not start Phase 4** until 3c is done or explicitly deferred.

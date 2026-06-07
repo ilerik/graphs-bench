@@ -18,6 +18,8 @@ What is currently proved without `sorry`:
   now proved by a permutation/counting argument, not trusted.
 - `Sssp.Refine.GraphBridge.outEdge_floatWeight_preimage`: every CSR slot
   produced by `fromEdgeList` over nat weights stores a `floatWeight` image.
+- `Sssp.Refine.HeapBridge.dijkstraHeap_length`: lazy-heap Dijkstra returns
+  exactly one distance slot per graph vertex.
 - Fixture regressions: shared JSON examples agree between the Lean operational
   model and Rust tests.
 
@@ -65,6 +67,9 @@ Module: `formal/lean/Sssp/Refine/HeapBridge.lean`
 | Declaration | Why it is trusted now | Replacement direction |
 |-------------|-----------------------|-----------------------|
 | `dijkstraHeap_eq_dijkstraRelax` | Connects the lazy-heap operational model to the `n`-round relax model. | Prove loop invariants for `dijkstraRun`: stale-entry safety, heap completeness, and agreement with relaxation on valid nonnegative nat-weight graphs. |
+
+Already proved in this module: `dijkstraStep_dist_length`,
+`dijkstraRun_dist_length`, and `dijkstraHeap_length`.
 
 ## Specification Oracles
 

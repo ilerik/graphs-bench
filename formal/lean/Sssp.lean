@@ -27,7 +27,7 @@
   │ Sssp.Refine.NumericBridge │ Float/`NNReal` embedding (Phase 3b)      │ —                        │
   │ Sssp.Refine.RelaxBridge │ CSR relax alignment (proved)              │ —                        │
   │ Sssp.Refine.Simulation  │ `floatRelaxRound` + invariants (3b)      │ —                        │
-  │ Sssp.Refine.HeapBridge  │ heap ≡ relax (trusted + fixture checks)    │ —                        │
+  │ Sssp.Refine.HeapBridge  │ heap length proved; heap≡relax trusted     │ —                        │
   │ Sssp.Refine.RefineCorrectness │ Main refinement theorem (3b)         │ —                        │
   │ Sssp.Refine.Verification      │ End-to-end API (`dijkstra_verified`) │ —                        │
   │ Sssp.Fixtures.*  │ CI regression + fixture refinement checks       │ —                        │

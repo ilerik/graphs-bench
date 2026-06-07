@@ -40,6 +40,7 @@ flowchart TB
 | `refine_dijkstraRelax_correct` | `RefineCorrectness` | **Proved** |
 | `refine_dijkstra_correct` (heap) | `RefineCorrectness` | **Proved** (via HeapBridge axiom) |
 | `dijkstraHeap = dijkstraRelax` | `HeapBridge` | **Axiom** + fixture `native_decide` |
+| `dijkstraHeap` output length = `g.n` | `HeapBridge` | **Proved** |
 | Rust `dijkstra` refines `Refine.dijkstra` | — | **Not started** |
 
 Main unconditional theorem:
@@ -95,6 +96,8 @@ Fixture `ValidRustGraph` instances are **proved** (no axioms).
 | `dijkstraHeap_eq_dijkstraRelax` | `dijkstraRun` invariants: soundness + completeness on nat weights, out-degree ≤ 2 |
 
 Model matches `src/dijkstra.rs`: lazy min-heap, stale-entry skip, same relax condition.
+Length preservation for `dijkstraStep`, `dijkstraRun`, and `dijkstraHeap` is
+already proved.
 
 ### 5. Rust refinement (`src/dijkstra.rs`)
 
