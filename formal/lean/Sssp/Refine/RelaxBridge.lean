@@ -252,11 +252,41 @@ theorem floatRelaxOut_aligned (vg : ValidRustGraph n g) (dHat : DistEstimate n) 
   rw [floatRelaxOut_relaxCsrOut_aligned (vg := vg) u dHat dist hlen halign x,
     relaxOutEdges_eq_relaxCsrOut (vg := vg) (u := u) (dHat := dHat)]
 
-axiom foldl_range_floatRelaxAll_aligned (vg : ValidRustGraph n g) (dHat : DistEstimate n)
+private theorem foldl_floatRelaxOut_aligned (vg : ValidRustGraph n g) (us : List (Fin n))
+    (dHat : DistEstimate n) (dist : List Float) (hlen : dist.length = n)
+    (halign : ∀ x : Fin n, dist[x.val]! = nnrealToFloat (dHat x)) :
+    ∀ x : Fin n,
+      ((us.map fun u => u.val).foldl (fun dist' u => floatRelaxOut g dist' u) dist)[x.val]! =
+        nnrealToFloat ((us.foldl (fun dHat' u => relaxOutEdges vg.toGraph dHat' u) dHat) x) := by
+  induction us generalizing dHat dist with
+  | nil =>
+    intro x
+    simp [halign x]
+  | cons u us ih =>
+    intro x
+    have hlen' : (floatRelaxOut g dist u.val).length = n := by
+      have hg : dist.length = g.n := hlen.trans vg.hn.symm
+      exact (floatRelaxOut_length dist u.val hg).trans vg.hn
+    have halign' : ∀ y : Fin n,
+        (floatRelaxOut g dist u.val)[y.val]! =
+          nnrealToFloat ((relaxOutEdges vg.toGraph dHat u) y) :=
+      floatRelaxOut_aligned vg dHat dist u hlen halign
+    simpa [List.map_cons, List.foldl_cons] using
+      ih (dHat := relaxOutEdges vg.toGraph dHat u) (dist := floatRelaxOut g dist u.val)
+        hlen' halign' x
+
+theorem foldl_range_floatRelaxAll_aligned (vg : ValidRustGraph n g) (dHat : DistEstimate n)
     (dist : List Float) (hlen : dist.length = n)
     (halign : ∀ x : Fin n, dist[x.val]! = nnrealToFloat (dHat x)) :
     ∀ v : Fin n,
-      (floatRelaxAll g dist)[v.val]! = nnrealToFloat (relaxAll vg.toGraph dHat v)
+      (floatRelaxAll g dist)[v.val]! = nnrealToFloat (relaxAll vg.toGraph dHat v) := by
+  intro v
+  dsimp [floatRelaxAll, relaxAll]
+  have hrange : List.range g.n = (List.finRange n).map (fun u : Fin n => u.val) := by
+    rw [vg.hn]
+    exact (List.map_coe_finRange_eq_range (n := n)).symm
+  rw [hrange]
+  exact foldl_floatRelaxOut_aligned vg (List.finRange n) dHat dist hlen halign v
 
 theorem floatRelaxAll_simInv (vg : ValidRustGraph n g) (s : Fin n) (dist : List Float)
     (dHat : DistEstimate n) (h : SimInv vg s dist dHat) :

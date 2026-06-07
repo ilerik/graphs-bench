@@ -17,7 +17,7 @@ namespace Algo
 variable {n : ℕ}
 
 noncomputable def relaxAll (G : Graph n) (dHat : DistEstimate n) : DistEstimate n :=
-  (Finset.univ : Finset (Fin n)).toList.foldl (fun dHat' u => relaxOutEdges G dHat' u) dHat
+  (List.finRange n).foldl (fun dHat' u => relaxOutEdges G dHat' u) dHat
 
 noncomputable def relaxRound (G : Graph n) (fuel : ℕ) (dHat : DistEstimate n) : DistEstimate n :=
   match fuel with
@@ -120,7 +120,7 @@ private lemma foldl_relaxAll_le {G : Graph n} (us : List (Fin n)) (dHat : DistEs
 
 private lemma le_relaxAll {G : Graph n} (dHat : DistEstimate n) (v : Fin n) :
     (relaxAll G dHat) v ≤ dHat v :=
-  foldl_relaxAll_le (Finset.univ : Finset (Fin n)).toList dHat v
+  foldl_relaxAll_le (List.finRange n) dHat v
 
 private lemma foldl_relaxAll_mono {G : Graph n} (us : List (Fin n)) (d₁ d₂ : DistEstimate n)
     (v : Fin n) (h : ∀ x, d₂ x ≤ d₁ x) :
@@ -160,9 +160,8 @@ private lemma foldl_relaxAll_le_add {G : Graph n} (dHat : DistEstimate n) (src t
 private lemma relaxAll_le_add_edge {G : Graph n} (dHat : DistEstimate n) (src tgt : Fin n)
     (w : NNReal) (h : w ∈ G.edges src tgt) :
     (relaxAll G dHat) tgt ≤ dHat src + (w : WithTop NNReal) := by
-  have hsrc : src ∈ (Finset.univ : Finset (Fin n)).toList :=
-    Finset.mem_toList.mpr (Finset.mem_univ src)
-  exact foldl_relaxAll_le_add dHat src tgt w (Finset.univ : Finset (Fin n)).toList h hsrc
+  have hsrc : src ∈ List.finRange n := List.mem_finRange src
+  exact foldl_relaxAll_le_add dHat src tgt w (List.finRange n) h hsrc
 
 private lemma relaxRound_le {G : Graph n} (fuel : ℕ) (dHat : DistEstimate n) (v : Fin n) :
     relaxRound G fuel dHat v ≤ dHat v := by
@@ -239,7 +238,7 @@ theorem relaxAll_sound {G : Graph n} {s : Fin n} (dHat : DistEstimate n)
     (h : Sound G s dHat) : Sound G s (relaxAll G dHat) := by
   unfold relaxAll
   revert dHat h
-  induction (Finset.univ : Finset (Fin n)).toList with
+  induction List.finRange n with
   | nil => intro dHat h v; exact h v
   | cons u us ih =>
     intro dHat h v

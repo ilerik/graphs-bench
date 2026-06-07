@@ -69,7 +69,6 @@ Module: `formal/lean/Sssp/Refine/RelaxBridge.lean`
 | Declaration | Why it is trusted now | Replacement direction |
 |-------------|-----------------------|-----------------------|
 | `relaxOutEdges_eq_relaxCsrOut` | Aligns CSR out-edge fold order with `Graph.outEdges`. | Prove that `relaxCsrOut` is permutation/order compatible with `relaxOutEdges`, or redefine one side to share the same order. |
-| `foldl_range_floatRelaxAll_aligned` | Lifts per-vertex relax alignment across all vertices. | Prove by induction over `List.range g.n` using `floatRelaxOut_aligned`. |
 
 ## Heap Bridge
 

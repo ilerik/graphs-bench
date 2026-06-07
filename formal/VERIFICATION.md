@@ -19,7 +19,7 @@ flowchart TB
   end
   subgraph proof [Proof chain]
     HB["HeapBridge\naxiom: heap = relax"]
-    RB["RelaxBridge\naxiom: float relax = Algo relax"]
+    RB["RelaxBridge\naxiom: CSR out-edge order"]
     SIM["Simulation\nSimInv + fuel"]
   end
   subgraph verified [Verified]
@@ -36,7 +36,7 @@ flowchart TB
 | Statement | Module | Status |
 |-----------|--------|--------|
 | `Algo.dijkstra G s v = trueDist G s v` | `Sssp.Algo.Dijkstra` | **Proved** |
-| `dijkstraRelax … = nnrealToFloat (Algo.dijkstra …)` | `Simulation` | **Proved** (via RelaxBridge axioms) |
+| `dijkstraRelax … = nnrealToFloat (Algo.dijkstra …)` | `Simulation` | **Proved** (via the remaining RelaxBridge axiom) |
 | `refine_dijkstraRelax_correct` | `RefineCorrectness` | **Proved** |
 | `refine_dijkstra_correct` (heap) | `RefineCorrectness` | **Proved** (via HeapBridge axiom) |
 | `dijkstraHeap = dijkstraRelax` | `HeapBridge` | **Axiom** + fixture `native_decide` |
@@ -76,7 +76,7 @@ Dijkstra refinement proof.
 | `floatRelaxEdge_aligned` | **Proved** |
 | `floatRelaxOut_aligned` | **Proved modulo** `relaxOutEdges_eq_relaxCsrOut` |
 | `relaxOutEdges_eq_relaxCsrOut` | **Axiom** — CSR order vs `Graph.outEdges` order |
-| `foldl_range_floatRelaxAll_aligned` | **Axiom** — induction over `List.range` still pending |
+| `foldl_range_floatRelaxAll_aligned` | **Proved** — full-vertex fold alignment |
 
 Length lemmas are already proved.
 
@@ -116,5 +116,5 @@ Fixtures prove **operational agreement**; they do not replace proof obligations 
 
 ## Next milestone
 
-**Phase 3c:** eliminate RelaxBridge axioms (items 1–2 above), then heap simulation (item 4).
+**Phase 3c:** eliminate the remaining RelaxBridge axiom (item 2 above), then heap simulation (item 4).
 Phase 4 (`DStruct`, …) stays blocked until Phase 3c axioms are gone or explicitly deferred.
