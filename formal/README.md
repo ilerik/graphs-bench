@@ -73,6 +73,7 @@ formal/
 ├── VERIFICATION.md            ← Dijkstra refinement stack
 ├── FUTURE_WORK.md             ← next milestones
 ├── paper/
+│   ├── README.md             ← paper source/build notes
 │   ├── 2504.17033v2.pdf       ← the article (17 pp. PDF)
 │   ├── 2504.17033.tar.gz      ← arXiv TeX source archive
 │   └── source/                ← extracted TeX sources

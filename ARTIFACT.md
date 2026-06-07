@@ -54,13 +54,15 @@ Include:
 - `formal/lean/lake-manifest.json`
 - `formal/paper/2504.17033v2.pdf`
 - `formal/paper/2504.17033.tar.gz`
-- `formal/paper/source/`
+- `formal/paper/source/`, including tracked arXiv source files such as
+  `main.bbl` when present
 
 Exclude generated build outputs:
 
 - `target/`
 - `formal/lean/.lake/`
-- `formal/paper/source/*.aux`, `*.bbl`, `*.blg`, `*.log`, `*.out`, `*.synctex.gz`
+- untracked TeX build products such as `formal/paper/source/*.aux`, `*.blg`,
+  `*.log`, `*.out`, and `*.synctex.gz`
 
 ## Licensing Note
 
