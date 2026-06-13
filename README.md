@@ -1,5 +1,9 @@
 # graphs-bench
 
+[![CI](https://github.com/ilerik/graphs-bench/actions/workflows/ci.yml/badge.svg)](https://github.com/ilerik/graphs-bench/actions/workflows/ci.yml)
+[![arXiv](https://img.shields.io/badge/arXiv-2506.xxxxx-b31b1b.svg)](https://arxiv.org/abs/...)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Rust implementation and benchmark of the directed single-source shortest path
 algorithm from
 
@@ -16,9 +20,13 @@ See [`ALGORITHM.md`](./ALGORITHM.md) for a detailed write-up of the algorithm
 `BMSSP`, the partial-sorting data structure `D`, and the complexity analysis).
 
 For the **formal verification** in Lean 4 + Mathlib (a blueprint with every
-paper lemma stated; proofs in progress), see [`formal/`](./formal/). The
-arXiv article and its TeX source are vendored under
-[`formal/paper/`](./formal/paper/).
+paper lemma stated; proofs in progress), see [`formal/`](./formal/). 
+
+**Key documentation:**
+- [`formal/README.md`](./formal/README.md) — Verification roadmap and status
+- [`formal/VERIFICATION.md`](./formal/VERIFICATION.md) — Dijkstra proof stack
+- [`formal/PROOF_DEPENDENCIES.md`](./formal/PROOF_DEPENDENCIES.md) — **Theorem dependency graph**
+- [`ALGORITHM.md`](./ALGORITHM.md) — BMSSP algorithm write-up
 
 ## Layout
 
@@ -97,3 +105,23 @@ The benchmark exposes three things:
 
 The benchmark prints `match=yes` on every line: BMSSP's distances agree with
 Dijkstra exactly (to within `1e-7` relative tolerance).
+
+## Formal Verification
+
+This repository includes a **verified floating-point Dijkstra** in Lean 4 + Mathlib:
+
+| Component | Status | Axioms |
+|-----------|--------|--------|
+| `Sssp.Algo.Dijkstra` | ✅ Verified | 0 |
+| `Refine.RelaxBridge` | ✅ Proved | 0 |
+| `Refine.GraphBridge` | ✅ Proved | 0 |
+| `Refine.NumericBridge` | ⏳ IEEE-754 facts | 21 |
+| `Refine.HeapBridge` | ⏳ Heap simulation | 1 |
+
+**Headline theorem** (`dijkstra_correct`):
+```lean
+theorem dijkstra_correct {G : Graph n} {s v : Fin n} :
+    dijkstra G s v = trueDist G s v
+```
+
+See [`formal/PROOF_DEPENDENCIES.md`](./formal/PROOF_DEPENDENCIES.md) for the full theorem dependency graph.
